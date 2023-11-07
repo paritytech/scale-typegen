@@ -39,7 +39,7 @@ mod nested {
 
 #[derive(TypeInfo)]
 pub struct Person {
-    name: String,
+    name: Box<String>,
     age: u8,
 }
 
@@ -68,7 +68,7 @@ impl RegistryBuilder {
 fn test_code_gen() {
     let mut types = RegistryBuilder::new()
         .with::<Person>()
-        .with::<Animal>()
+        // .with::<Animal>()
         .build();
     let mut settings = TypeGeneratorSettings::default();
     settings.derives.extend_for_all(

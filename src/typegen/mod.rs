@@ -2,7 +2,7 @@ use self::{
     derives::{Derives, DerivesRegistry},
     module_ir::ModuleIR,
     settings::TypeGeneratorSettings,
-    type_ir::{CompositeIR, CompositeIRKind, EnumIR, IsCompact, TypeIR, TypeIRKind},
+    type_ir::{CompositeFieldIR, CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
     type_params::TypeParameters,
     type_path::{TypeParameter, TypePath, TypePathType},
 };
@@ -167,15 +167,20 @@ impl<'a> TypeGenerator<'a> {
                         type_params.params(),
                         Some(&field_name),
                     )?;
-                    let is_compact = IsCompact(path.is_compact());
-
+                    let is_compact = path.is_compact();
+                    let is_boxed = field
+                        .type_name
+                        .as_ref()
+                        .map(|e| e.contains("Box<"))
+                        .unwrap_or_default();
+                    dbg!(&is_boxed, &path);
                     for param in path.parent_type_params().iter() {
                         type_params.mark_used(param);
                     }
 
-                    Ok((ident, is_compact, path))
+                    Ok((ident, CompositeFieldIR::new(path, is_compact, is_boxed)))
                 })
-                .collect::<anyhow::Result<Vec<(Ident, IsCompact, TypePath)>>>()?;
+                .collect::<anyhow::Result<Vec<(Ident, CompositeFieldIR)>>>()?;
             Ok(CompositeIRKind::Named(named_fields))
         } else if all_fields_unnamed {
             let unnamed_fields = fields
@@ -183,15 +188,21 @@ impl<'a> TypeGenerator<'a> {
                 .map(|field| {
                     let path =
                         self.resolve_field_type_path(field.ty.id, type_params.params(), None)?;
-                    let is_compact = IsCompact(path.is_compact());
 
+                    let is_compact = path.is_compact();
+                    let is_boxed = field
+                        .type_name
+                        .as_ref()
+                        .map(|e| e.contains("Box<"))
+                        .unwrap_or_default();
+                    dbg!(&is_boxed, &path);
                     for param in path.parent_type_params().iter() {
                         type_params.mark_used(param);
                     }
 
-                    Ok((is_compact, path))
+                    Ok(CompositeFieldIR::new(path, is_compact, is_boxed))
                 })
-                .collect::<anyhow::Result<Vec<(IsCompact, TypePath)>>>()?;
+                .collect::<anyhow::Result<Vec<CompositeFieldIR>>>()?;
             Ok(CompositeIRKind::Unnamed(unnamed_fields))
         } else {
             unreachable!("Is either all unnamed or all named. qed.")

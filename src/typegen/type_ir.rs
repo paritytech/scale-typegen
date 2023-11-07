@@ -44,16 +44,28 @@ pub struct EnumIR {
 #[derive(Debug, Clone)]
 pub enum CompositeIRKind {
     NoFields,
-    Named(Vec<(Ident, IsCompact, TypePath)>),
-    Unnamed(Vec<(IsCompact, TypePath)>),
+    Named(Vec<(Ident, CompositeFieldIR)>),
+    Unnamed(Vec<CompositeFieldIR>),
 }
 
 #[derive(Debug, Clone)]
-pub struct IsCompact(pub bool);
+pub struct CompositeFieldIR {
+    type_path: TypePath,
+    is_compact: bool,
+    is_boxed: bool,
+}
 
-impl IsCompact {
+impl CompositeFieldIR {
+    pub fn new(type_path: TypePath, is_compact: bool, is_boxed: bool) -> Self {
+        CompositeFieldIR {
+            type_path,
+            is_compact,
+            is_boxed,
+        }
+    }
+
     pub fn compact_attr(&self) -> Option<TokenStream> {
-        self.0.then(|| quote!( #[codec(compact)] ))
+        self.is_compact.then(|| quote!( #[codec(compact)] ))
     }
 }
 
@@ -127,9 +139,9 @@ impl CompositeIR {
                 }
             }
             CompositeIRKind::Named(fields) => {
-                let fields = fields.iter().map(|(name, is_compact, ty)| {
-                    let compact_attr = is_compact.compact_attr();
-                    quote! { #compact_attr pub #name: #ty }
+                let fields = fields.iter().map(|(name, field)| {
+                    let compact_attr = field.compact_attr();
+                    quote! { #compact_attr pub #name: #field }
                 });
                 let marker = phantom_data.map(|phantom_data| {
                     quote!(
@@ -145,9 +157,9 @@ impl CompositeIR {
                 )
             }
             CompositeIRKind::Unnamed(fields) => {
-                let fields = fields.iter().map(|(is_compact, ty)| {
-                    let compact_attr = is_compact.compact_attr();
-                    quote! { #compact_attr pub #ty }
+                let fields = fields.iter().map(|field| {
+                    let compact_attr = field.compact_attr();
+                    quote! { #compact_attr pub #field }
                 });
                 let marker = phantom_data.map(|phantom_data| {
                     quote!(
@@ -169,19 +181,30 @@ impl CompositeIR {
         match &self.kind {
             CompositeIRKind::NoFields => quote! {},
             CompositeIRKind::Named(ref fields) => {
-                let fields = fields.iter().map(|(name, is_compact, ty)| {
-                    let compact_attr = is_compact.compact_attr();
-                    quote! { #compact_attr #name: #ty }
+                let fields = fields.iter().map(|(name, field)| {
+                    let compact_attr = field.compact_attr();
+                    quote! { #compact_attr #name: #field }
                 });
                 quote!( { #( #fields, )* } )
             }
             CompositeIRKind::Unnamed(ref fields) => {
-                let fields = fields.iter().map(|(is_compact, ty)| {
-                    let compact_attr = is_compact.compact_attr();
-                    quote! { #compact_attr #ty }
+                let fields = fields.iter().map(|field| {
+                    let compact_attr = field.compact_attr();
+                    quote! { #compact_attr #field }
                 });
                 quote! { ( #( #fields, )* ) }
             }
+        }
+    }
+}
+
+impl ToTokens for CompositeFieldIR {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ty_path = &self.type_path;
+        if self.is_boxed {
+            tokens.extend(quote! { ::std::boxed::Box<#ty_path> })
+        } else {
+            tokens.extend(quote! { #ty_path })
         }
     }
 }
