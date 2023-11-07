@@ -8,8 +8,6 @@ use scale_info::{form::PortableForm, Path, TypeDefPrimitive};
 use std::collections::BTreeSet;
 use syn::parse_quote;
 
-use super::unused_type_params::{self, UnusedTypeParams};
-
 /// An opaque struct representing a type path. The main usage of this is
 /// to spit out as tokens in some `quote!{ ... }` macro; the inner structure
 /// should be unimportant.
@@ -38,16 +36,6 @@ impl TypePath {
     /// Construct a [`TypePath`] from a [`TypeParameter`]
     pub fn from_type(ty: TypePathType) -> TypePath {
         TypePath(TypePathInner::Type(ty))
-    }
-
-    pub fn phantom(unused_type_params: UnusedTypeParams) -> TypePath {
-        let type_paths: Vec<TypePath> = unused_type_params
-            .into_iter()
-            .map(|param| TypePath::from_parameter(param))
-            .collect();
-        TypePath(TypePathInner::Type(TypePathType::Phantom {
-            of: type_paths,
-        }))
     }
 
     /// Construct a [`TypePath`] from a [`syn::TypePath`]
@@ -121,9 +109,6 @@ pub enum TypePathType {
         path: syn::Path,
         params: Vec<TypePath>,
     },
-    Phantom {
-        of: Vec<TypePath>,
-    },
     Vec {
         of: Box<TypePath>,
     },
@@ -140,7 +125,6 @@ pub enum TypePathType {
     Compact {
         inner: Box<TypePath>,
         is_field: bool,
-        compact_type_path: syn::Path,
     },
     BitVec {
         bit_order_type: Box<TypePath>,
@@ -230,15 +214,14 @@ impl TypePathType {
                 bit_order_type.parent_type_params_recurse(acc);
                 bit_store_type.parent_type_params_recurse(acc);
             }
-            TypePathType::Phantom { .. } => (),
         }
     }
 
-    pub(crate) fn is_compact(&self) -> bool {
+    pub fn is_compact(&self) -> bool {
         matches!(self, TypePathType::Compact { .. })
     }
 
-    pub(crate) fn is_string(&self) -> bool {
+    pub fn is_string(&self) -> bool {
         matches!(
             self,
             TypePathType::Primitive {
@@ -286,17 +269,13 @@ impl TypePathType {
                 TypeDefPrimitive::I128 => parse_quote!(::core::primitive::i128),
                 TypeDefPrimitive::I256 => unimplemented!("not a rust primitive"),
             }),
-            TypePathType::Compact {
-                inner,
-                is_field,
-                compact_type_path,
-            } => {
+            TypePathType::Compact { inner, is_field } => {
                 let path = if *is_field {
                     // compact fields can use the inner compact type directly and be annotated with
                     // the `compact` attribute e.g. `#[codec(compact)] my_compact_field: u128`
                     parse_quote! ( #inner )
                 } else {
-                    parse_quote! ( #compact_type_path<#inner> )
+                    parse_quote! ( parity_scale_codec::Compact<#inner> )
                 };
                 syn::Type::Path(path)
             }
@@ -308,9 +287,6 @@ impl TypePathType {
                 let type_path =
                     parse_quote! { #decoded_bits_type_path<#bit_store_type, #bit_order_type> };
                 syn::Type::Path(type_path)
-            }
-            TypePathType::Phantom { of } => {
-                parse_quote! { ::core::marker::PhantomData< #( #of ),* > }
             }
         }
     }

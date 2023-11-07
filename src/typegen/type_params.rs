@@ -12,32 +12,16 @@ use std::collections::BTreeSet;
 /// Additionally this allows generating a `PhantomData` type for any type params which are unused
 /// in the type definition itself.
 #[derive(Clone, Debug, Default)]
-pub struct TypeDefParameters {
+pub struct TypeParameters {
     params: Vec<TypeParameter>,
     unused: BTreeSet<TypeParameter>,
 }
 
-impl TypeDefParameters {
-    /// Create a new [`TypeDefParameters`] instance.
+impl TypeParameters {
+    /// Create a new [`TypeParameters`] instance.
     pub fn new(params: Vec<TypeParameter>) -> Self {
         let unused = params.iter().cloned().collect();
         Self { params, unused }
-    }
-
-    /// Update the set of unused type parameters by removing those that are used in the given
-    /// fields.
-    pub fn update_unused<'a>(&mut self) {
-        // fields: impl Iterator<Item = &'a CompositeDefFieldType>
-
-        todo!()
-
-        // let mut used_type_params = BTreeSet::new();
-        // for field in fields {
-        //     field.type_path.parent_type_params(&mut used_type_params)
-        // }
-        // for used_type_param in &used_type_params {
-        //     self.unused.remove(used_type_param);
-        // }
     }
 
     /// Construct a [`core::marker::PhantomData`] for the type unused type params.
@@ -68,9 +52,13 @@ impl TypeDefParameters {
     pub fn has_unused_type_params(&self) -> bool {
         !self.unused.is_empty()
     }
+
+    pub fn mark_used(&mut self, param: &TypeParameter) {
+        self.unused.remove(param);
+    }
 }
 
-impl quote::ToTokens for TypeDefParameters {
+impl quote::ToTokens for TypeParameters {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         if !self.params.is_empty() {
             let params = &self.params;

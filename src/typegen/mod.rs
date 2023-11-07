@@ -1,10 +1,10 @@
 use self::{
     derives::{Derives, DerivesRegistry},
     module_ir::ModuleIR,
-    type_def_params::TypeDefParameters,
-    type_ir::{CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
+    settings::TypeGeneratorSettings,
+    type_ir::{CompositeIR, CompositeIRKind, EnumIR, IsCompact, TypeIR, TypeIRKind},
+    type_params::TypeParameters,
     type_path::{TypeParameter, TypePath, TypePathType},
-    unused_type_params::UnusedTypeParams,
 };
 use anyhow::anyhow;
 use proc_macro2::Ident;
@@ -13,45 +13,26 @@ use scale_info::{form::PortableForm, PortableRegistry, PortableType, Type, TypeD
 
 mod derives;
 pub mod module_ir;
-pub mod type_def_params;
+pub mod settings;
 pub mod type_ir;
+pub mod type_params;
 pub mod type_path;
-pub mod unused_type_params;
 
-pub struct Settings {
-    /// The name of the module which will contain the generated types.
-    type_mod_ident: String,
-    // /// User defined overrides for generated types.
-    // type_substitutes: TypeSubstitutes,
-    should_gen_docs: bool,
-    derives: DerivesRegistry,
-    /// e.g. `subxt::utils::bits::DecodedBits`,
-    ///
-    /// If set to None, the type generation fails when `BitSequence`s are encountered.
-    decoded_bits_type_path: Option<syn::Path>,
-    /// e.g. `subxt::ext::codec::Compact`,
-    ///
-    /// If set to None, the type generation fails when `Compact`s are encountered.
-    compact_type_path: Option<syn::Path>,
-}
-
-impl Settings {
-    pub fn type_derives(&self, ty: &Type<PortableForm>) -> anyhow::Result<Derives> {
-        let joined_path = ty.path.segments.join("::");
-        let ty_path: syn::TypePath = syn::parse_str(&joined_path)?;
-        Ok(self.derives.resolve(&ty_path))
-    }
-}
+#[cfg(test)]
+mod tests;
 
 pub struct TypeGenerator<'a> {
     type_registry: &'a PortableRegistry,
-    settings: Settings,
+    settings: TypeGeneratorSettings,
     root_mod_ident: Ident,
 }
 
 impl<'a> TypeGenerator<'a> {
     /// Construct a new [`TypeGenerator`].
-    pub fn new(type_registry: &'a PortableRegistry, settings: Settings) -> anyhow::Result<Self> {
+    pub fn new(
+        type_registry: &'a PortableRegistry,
+        settings: TypeGeneratorSettings,
+    ) -> anyhow::Result<Self> {
         let root_mod_ident: Ident = syn::parse_str(&settings.type_mod_ident)?;
         Ok(Self {
             type_registry,
@@ -97,8 +78,6 @@ impl<'a> TypeGenerator<'a> {
             return Ok(None);
         }
 
-        let derives = self.settings.type_derives(&ty)?;
-
         let type_params = ty
             .type_params
             .iter()
@@ -114,8 +93,7 @@ impl<'a> TypeGenerator<'a> {
                 })
             })
             .collect::<Vec<_>>();
-
-        let mut unused_type_params = UnusedTypeParams::new(&type_params);
+        let mut type_params = TypeParameters::new(type_params);
 
         let name = ty
             .path
@@ -125,16 +103,8 @@ impl<'a> TypeGenerator<'a> {
 
         let kind = match &ty.type_def {
             TypeDef::Composite(composite) => {
-                // go over the fields and subsequently remove used type params from unused params
-                let kind = self.create_composite_ir_kind(
-                    &composite.fields,
-                    &type_params,
-                    &mut unused_type_params,
-                )?;
-
-                let mut ir = CompositeIR { name, kind };
-                ir.add_phantom_data(unused_type_params);
-                TypeIRKind::Struct(ir)
+                let kind = self.create_composite_ir_kind(&composite.fields, &mut type_params)?;
+                TypeIRKind::Struct(CompositeIR { name, kind })
             }
             TypeDef::Variant(variant) => {
                 let variants = variant
@@ -142,21 +112,16 @@ impl<'a> TypeGenerator<'a> {
                     .iter()
                     .map(|v| {
                         let name = syn::parse_str::<Ident>(&v.name)?;
-                        let kind = self.create_composite_ir_kind(
-                            &v.fields,
-                            &type_params,
-                            &mut unused_type_params,
-                        )?;
+                        let kind = self.create_composite_ir_kind(&v.fields, &mut type_params)?;
                         Ok((v.index, CompositeIR { kind, name }))
                     })
                     .collect::<anyhow::Result<Vec<(u8, CompositeIR)>>>()?;
-
-                let mut ir = EnumIR { name, variants };
-                ir.add_phantom_data(unused_type_params);
-                TypeIRKind::Enum(ir)
+                TypeIRKind::Enum(EnumIR { name, variants })
             }
             _ => unreachable!("Other variants early return before. qed."),
         };
+
+        let derives = self.settings.type_derives(&ty)?;
 
         let docs = &ty.docs;
         let docs = self
@@ -166,25 +131,18 @@ impl<'a> TypeGenerator<'a> {
             .unwrap_or_default();
 
         let type_ir = TypeIR {
-            derives,
             kind,
+            derives,
             docs,
+            type_params,
         };
-
-        // Self {
-        //     type_params,
-        //     derives,
-        //     ty_kind,
-        //     ty_docs,
-        // }
         Ok(Some(type_ir))
     }
 
     fn create_composite_ir_kind(
         &self,
         fields: &[scale_info::Field<PortableForm>],
-        parent_type_params: &[TypeParameter],
-        unused_type_params: &mut UnusedTypeParams,
+        type_params: &mut TypeParameters,
     ) -> anyhow::Result<CompositeIRKind> {
         if fields.is_empty() {
             return Ok(CompositeIRKind::NoFields);
@@ -203,40 +161,46 @@ impl<'a> TypeGenerator<'a> {
                 .map(|field| {
                     let field_name = field.name.as_ref().unwrap();
                     let ident = syn::parse_str::<Ident>(&field_name)?;
+
                     let path = self.resolve_field_type_path(
                         field.ty.id,
-                        parent_type_params,
+                        type_params.params(),
                         Some(&field_name),
                     )?;
+                    let is_compact = IsCompact(path.is_compact());
 
                     for param in path.parent_type_params().iter() {
-                        unused_type_params.remove(param)
+                        type_params.mark_used(param);
                     }
 
-                    Ok((ident, path))
+                    Ok((ident, is_compact, path))
                 })
-                .collect::<anyhow::Result<Vec<(Ident, TypePath)>>>()?;
+                .collect::<anyhow::Result<Vec<(Ident, IsCompact, TypePath)>>>()?;
             Ok(CompositeIRKind::Named(named_fields))
         } else if all_fields_unnamed {
             let unnamed_fields = fields
                 .iter()
                 .map(|field| {
                     let path =
-                        self.resolve_field_type_path(field.ty.id, parent_type_params, None)?;
+                        self.resolve_field_type_path(field.ty.id, type_params.params(), None)?;
+                    let is_compact = IsCompact(path.is_compact());
+
                     for param in path.parent_type_params().iter() {
-                        unused_type_params.remove(param)
+                        type_params.mark_used(param);
                     }
-                    Ok(path)
+
+                    Ok((is_compact, path))
                 })
-                .collect::<anyhow::Result<Vec<TypePath>>>()?;
-            Ok(CompositeIRKind::UnNamed(unnamed_fields))
+                .collect::<anyhow::Result<Vec<(IsCompact, TypePath)>>>()?;
+            Ok(CompositeIRKind::Unnamed(unnamed_fields))
         } else {
             unreachable!("Is either all unnamed or all named. qed.")
         }
     }
 
     fn should_substitute_path(&self, path: &scale_info::Path<PortableForm>) -> bool {
-        todo!()
+        // todo!()
+        false
     }
 
     pub fn resolve_type(&self, id: u32) -> anyhow::Result<Type<PortableForm>> {
@@ -366,19 +330,9 @@ impl<'a> TypeGenerator<'a> {
                     None,
                 )?;
 
-                let compact_type_path = self
-                    .settings
-                    .compact_type_path
-                    .as_ref()
-                    .ok_or_else(|| {
-                        anyhow!("Compact type path is None, cannot generate types with compact encoded fields.")
-                    })?
-                    .clone();
-
                 TypePathType::Compact {
                     inner: Box::new(inner_type),
                     is_field,
-                    compact_type_path,
                 }
             }
             TypeDef::BitSequence(bitseq) => {
