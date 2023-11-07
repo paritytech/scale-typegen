@@ -209,7 +209,7 @@ impl TypePathType {
             TypePathType::BitVec {
                 bit_order_type,
                 bit_store_type,
-                decoded_bits_type_path,
+                ..
             } => {
                 bit_order_type.parent_type_params_recurse(acc);
                 bit_store_type.parent_type_params_recurse(acc);
