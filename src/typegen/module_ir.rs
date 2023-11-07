@@ -1,7 +1,5 @@
 use std::collections::BTreeMap;
 
-use crate::Settings;
-
 use super::type_ir::TypeIR;
 use proc_macro2::Span;
 use proc_macro2::{Ident, TokenStream};
