@@ -1,7 +1,5 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
-use scale_info::{form::PortableForm, Type};
-use syn::Item;
 
 use crate::typegen::{
     settings::derives::Derives, type_params::TypeParameters, type_path::TypePath,
@@ -170,7 +168,7 @@ impl CompositeIR {
                 });
                 quote! {
                     (
-                        #( #fields, )*
+                        #( #fields ),*
                         #marker
                     )
                 }
@@ -193,7 +191,7 @@ impl CompositeIR {
                     let compact_attr = field.compact_attr();
                     quote! { #compact_attr #field }
                 });
-                quote! { ( #( #fields, )* ) }
+                quote! { ( #( #fields ),* ) }
             }
         }
     }

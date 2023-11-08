@@ -1,16 +1,15 @@
 use self::{
     ir::module_ir::ModuleIR,
     ir::type_ir::{CompositeFieldIR, CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
-    settings::derives::{Derives, DerivesRegistry},
     settings::TypeGeneratorSettings,
     type_params::TypeParameters,
-    type_path::{TypeParameter, TypePath, TypePathType},
+    type_path::{TypeParameter},
     type_path_resolver::TypePathResolver,
 };
 use anyhow::anyhow;
 use proc_macro2::Ident;
 use quote::{format_ident, quote};
-use scale_info::{form::PortableForm, PortableRegistry, PortableType, Type, TypeDef};
+use scale_info::{form::PortableForm, PortableRegistry, PortableType, TypeDef};
 
 pub mod ir;
 pub mod settings;
@@ -68,7 +67,7 @@ impl<'a> TypeGenerator<'a> {
     }
 
     fn create_type_ir(&self, ty: &PortableType) -> anyhow::Result<Option<TypeIR>> {
-        let PortableType { ty, id } = &ty;
+        let PortableType { ty, id: _ } = &ty;
 
         // if the type is some builtin, early return, we are only interested in generating structs and enums.
         if !matches!(ty.type_def, TypeDef::Composite(_) | TypeDef::Variant(_)) {
@@ -118,7 +117,7 @@ impl<'a> TypeGenerator<'a> {
             _ => unreachable!("Other variants early return before. qed."),
         };
 
-        let derives = self.settings.type_derives(&ty)?;
+        let derives = self.settings.type_derives(ty)?;
 
         let docs = &ty.docs;
         let docs = self
@@ -159,7 +158,7 @@ impl<'a> TypeGenerator<'a> {
                 .iter()
                 .map(|field| {
                     let field_name = field.name.as_ref().unwrap();
-                    let ident = syn::parse_str::<Ident>(&field_name)?;
+                    let ident = syn::parse_str::<Ident>(field_name)?;
 
                     let path = type_path_resolver.resolve_field_type_path(
                         field.ty.id,
@@ -213,7 +212,7 @@ impl<'a> TypeGenerator<'a> {
 
     fn type_path_resolver(&self) -> TypePathResolver<'_> {
         TypePathResolver::new(
-            &self.type_registry,
+            self.type_registry,
             &self.settings.substitutes,
             self.settings.decoded_bits_type_path.as_ref(),
             &self.root_mod_ident,

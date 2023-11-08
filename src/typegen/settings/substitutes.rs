@@ -1,6 +1,6 @@
 use proc_macro2::Span;
 use std::{borrow::Borrow, collections::HashMap};
-use syn::{parse_quote, spanned::Spanned as _};
+use syn::{spanned::Spanned as _};
 
 use crate::typegen::type_path::{TypePath, TypePathType};
 

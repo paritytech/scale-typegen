@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use quote::ToTokens;
-use syn::parse_quote;
+
 
 /// A struct containing the derives that we'll be applying to types;
 /// a combination of some common derives for all types, plus type
@@ -64,19 +64,13 @@ impl DerivesRegistry {
 /// A struct storing the set of derives and derive attributes that we'll apply
 /// to generated types.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct Derives {
     derives: HashSet<syn::Path>,
     attributes: HashSet<syn::Attribute>,
 }
 
-impl Default for Derives {
-    fn default() -> Self {
-        Self {
-            derives: Default::default(),
-            attributes: Default::default(),
-        }
-    }
-}
+
 
 impl FromIterator<syn::Path> for Derives {
     fn from_iter<T: IntoIterator<Item = syn::Path>>(iter: T) -> Self {

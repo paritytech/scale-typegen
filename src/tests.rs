@@ -1,22 +1,10 @@
-use std::collections::{BTreeMap, HashMap};
-
+use parity_scale_codec::Compact;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use scale_info::{form::MetaForm, PortableRegistry, Registry, TypeInfo};
+use scale_info::{PortableRegistry, TypeInfo};
 use syn::parse_quote;
 
-use crate::{
-    path_segments,
-    typegen::{
-        settings::{
-            substitutes::{absolute_path, AbsolutePath, PathSegments},
-            TypeGeneratorSettings,
-        },
-        TypeGenerator,
-    },
-};
-
-use self::nested::Animal;
+use crate::typegen::{settings::TypeGeneratorSettings, TypeGenerator};
 
 mod nested {
     use parity_scale_codec::Compact;
@@ -53,13 +41,13 @@ pub struct Person {
     age: u8,
 }
 
-struct CodeGenBuilder {
+struct CodegenBuilder {
     registry: scale_info::Registry,
 }
 
-impl CodeGenBuilder {
+impl CodegenBuilder {
     fn new() -> Self {
-        CodeGenBuilder {
+        CodegenBuilder {
             registry: scale_info::Registry::new(),
         }
     }
@@ -98,7 +86,7 @@ fn substitutes_and_derives_work() {
     }
 
     // check the generated code
-    let code = CodeGenBuilder::new().with::<A>().gen(settings).unwrap();
+    let code = CodegenBuilder::new().with::<A>().gen(settings).unwrap();
     let expected_code = quote! {
         pub mod my_types {
             use super::my_types;
@@ -118,23 +106,72 @@ fn substitutes_and_derives_work() {
     assert_eq!(code.to_string(), expected_code.to_string());
 }
 
-// #[test]
-// fn test_code_gen() {
-//     let mut types = RegistryBuilder::new()
-//         .with::<Person>()
-//         // .with::<Animal>()
-//         .build();
-//     let mut settings = TypeGeneratorSettings::default();
-//     settings.derives.extend_for_all(
-//         [
-//             syn::parse_str("::parity_scale_codec::Decode").unwrap(),
-//             syn::parse_str("::parity_scale_codec::Encode").unwrap(),
-//         ],
-//         [],
-//     );
-//     let type_gen = TypeGenerator::new(&types, settings).unwrap();
+#[test]
+fn different_structures_work() {
+    #[derive(TypeInfo)]
+    pub enum Animal {
+        Cat,
+        Ant(bool),
+        Monkey {
+            favorite_food: Food,
+            length: Centimeter,
+        },
+        Chimera {
+            base: Box<Animal>,
+            mutations: Box<Animal>,
+        },
+    }
 
-//     let m = type_gen.generate_types_mod().unwrap();
-//     let code = m.into_token_stream();
-//     // std::fs::write("code.rs", code.to_string());
-// }
+    #[derive(TypeInfo)]
+    pub struct Centimeter(Compact<u16>);
+
+    #[derive(TypeInfo)]
+    pub enum Food {
+        Banana,
+        Orange,
+        Apple,
+    }
+    let settings = TypeGeneratorSettings::default();
+    let code = CodegenBuilder::new()
+        .with::<Animal>()
+        .gen(settings)
+        .unwrap();
+
+    let expected_code = quote! {
+        pub mod types {
+            use super::types;
+            pub mod scale_typegen {
+                use super::types;
+                pub mod tests {
+                    use super::types;
+                    pub enum Animal {
+                        #[codec(index = 0)]
+                        Cat,
+                        #[codec(index = 1)]
+                        Ant(::core::primitive::bool),
+                        #[codec(index = 2)]
+                        Monkey {
+                            favorite_food: types::scale_typegen::tests::Food,
+                            length: types::scale_typegen::tests::Centimeter,
+                        },
+                        #[codec(index = 3)]
+                        Chimera {
+                            base: ::std::boxed::Box<types::scale_typegen::tests::Animal>,
+                            mutations: ::std::boxed::Box<types::scale_typegen::tests::Animal>,
+                        },
+                    }
+                    pub struct Centimeter(#[codec(compact)] pub ::core::primitive::u16);
+                    pub enum Food {
+                        #[codec(index = 0)]
+                        Banana,
+                        #[codec(index = 1)]
+                        Orange,
+                        #[codec(index = 2)]
+                        Apple,
+                    }
+                }
+            }
+        }
+    };
+    assert_eq!(code.to_string(), expected_code.to_string());
+}
