@@ -1,5 +1,13 @@
+use std::collections::{BTreeMap, HashMap};
+
 use quote::ToTokens;
 use scale_info::{form::MetaForm, PortableRegistry, Registry, TypeInfo};
+use syn::parse_quote;
+
+use crate::{
+    path_segments,
+    typegen::substitutes::{AbsolutePath, PathSegments},
+};
 
 use self::nested::Animal;
 
@@ -65,6 +73,31 @@ impl RegistryBuilder {
 }
 
 #[test]
+fn substitutes_work() {
+    let mut settings = TypeGeneratorSettings::default();
+    settings.derives.extend_for_all(
+        [
+            syn::parse_str("::parity_scale_codec::Decode").unwrap(),
+            syn::parse_str("::parity_scale_codec::Encode").unwrap(),
+        ],
+        [],
+    );
+    settings.substitutes.insert(
+        parse_quote!(std::collections::BTreeMap),
+        AbsolutePath(parse_quote!(B)),
+    );
+    #[derive(TypeInfo)]
+    struct A {
+        a: BTreeMap<u32, A>,
+    }
+    let types = RegistryBuilder::new().with::<A>().build();
+    let type_gen = TypeGenerator::new(&types, settings).unwrap();
+    let m = type_gen.generate_types_mod().unwrap();
+    let s = m.to_token_stream().to_string();
+    std::fs::write("code.rs", s.to_string());
+}
+
+#[test]
 fn test_code_gen() {
     let mut types = RegistryBuilder::new()
         .with::<Person>()
@@ -82,5 +115,5 @@ fn test_code_gen() {
 
     let m = type_gen.generate_types_mod().unwrap();
     let code = m.into_token_stream();
-    std::fs::write("code.rs", code.to_string());
+    // std::fs::write("code.rs", code.to_string());
 }

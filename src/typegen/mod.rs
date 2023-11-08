@@ -5,18 +5,21 @@ use self::{
     type_ir::{CompositeFieldIR, CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
     type_params::TypeParameters,
     type_path::{TypeParameter, TypePath, TypePathType},
+    type_path_resolver::TypePathResolver,
 };
 use anyhow::anyhow;
 use proc_macro2::Ident;
 use quote::{format_ident, quote};
 use scale_info::{form::PortableForm, PortableRegistry, PortableType, Type, TypeDef};
 
-mod derives;
+pub mod derives;
 pub mod module_ir;
 pub mod settings;
+pub mod substitutes;
 pub mod type_ir;
 pub mod type_params;
 pub mod type_path;
+pub mod type_path_resolver;
 
 #[cfg(test)]
 mod tests;
@@ -33,7 +36,7 @@ impl<'a> TypeGenerator<'a> {
         type_registry: &'a PortableRegistry,
         settings: TypeGeneratorSettings,
     ) -> anyhow::Result<Self> {
-        let root_mod_ident: Ident = syn::parse_str(&settings.type_mod_ident)?;
+        let root_mod_ident: Ident = syn::parse_str(&settings.type_mod_name)?;
         Ok(Self {
             type_registry,
             settings,
@@ -49,7 +52,7 @@ impl<'a> TypeGenerator<'a> {
             let path = &ty.ty.path;
             // Don't generate a type if it was substituted - the target type might
             // not be in the type registry + our resolution already performs the substitution.
-            if self.should_substitute_path(path) {
+            if self.settings.substitutes.contains(path) {
                 continue;
             }
 
@@ -144,6 +147,8 @@ impl<'a> TypeGenerator<'a> {
         fields: &[scale_info::Field<PortableForm>],
         type_params: &mut TypeParameters,
     ) -> anyhow::Result<CompositeIRKind> {
+        let type_path_resolver = self.type_path_resolver();
+
         if fields.is_empty() {
             return Ok(CompositeIRKind::NoFields);
         }
@@ -162,10 +167,10 @@ impl<'a> TypeGenerator<'a> {
                     let field_name = field.name.as_ref().unwrap();
                     let ident = syn::parse_str::<Ident>(&field_name)?;
 
-                    let path = self.resolve_field_type_path(
+                    let path = type_path_resolver.resolve_field_type_path(
                         field.ty.id,
                         type_params.params(),
-                        Some(&field_name),
+                        field.type_name.as_deref(),
                     )?;
                     let is_compact = path.is_compact();
                     let is_boxed = field
@@ -186,8 +191,11 @@ impl<'a> TypeGenerator<'a> {
             let unnamed_fields = fields
                 .iter()
                 .map(|field| {
-                    let path =
-                        self.resolve_field_type_path(field.ty.id, type_params.params(), None)?;
+                    let path = type_path_resolver.resolve_field_type_path(
+                        field.ty.id,
+                        type_params.params(),
+                        field.type_name.as_deref(),
+                    )?;
 
                     let is_compact = path.is_compact();
                     let is_boxed = field
@@ -209,182 +217,12 @@ impl<'a> TypeGenerator<'a> {
         }
     }
 
-    fn should_substitute_path(&self, path: &scale_info::Path<PortableForm>) -> bool {
-        // todo!()
-        false
-    }
-
-    pub fn resolve_type(&self, id: u32) -> anyhow::Result<Type<PortableForm>> {
-        let ty = self
-            .type_registry
-            .resolve(id)
-            .ok_or_else(|| anyhow!("No type with id {id} found"))?;
-        Ok(ty.clone())
-    }
-
-    /// Get the type path for a field of a struct or an enum variant, providing any generic
-    /// type parameters from the containing type. This is for identifying where a generic type
-    /// parameter is used in a field type e.g.
-    ///
-    /// ```rust
-    /// struct S<T> {
-    ///     a: T, // `T` is the "parent" type param from the containing type.
-    ///     b: Vec<Option<T>>, // nested use of generic type param `T`.
-    /// }
-    /// ```
-    ///
-    /// This allows generating the correct generic field type paths.
-    ///
-    /// # Panics
-    ///
-    /// If no type with the given id found in the type registry.
-    pub fn resolve_field_type_path(
-        &self,
-        id: u32,
-        parent_type_params: &[TypeParameter],
-        original_name: Option<&str>,
-    ) -> anyhow::Result<TypePath> {
-        self.resolve_type_path_recurse(id, true, parent_type_params, original_name)
-    }
-
-    /// Get the type path for the given type identifier.
-    ///
-    /// # Panics
-    ///
-    /// If no type with the given id found in the type registry.
-    pub fn resolve_type_path(&self, id: u32) -> anyhow::Result<TypePath> {
-        self.resolve_type_path_recurse(id, false, &[], None)
-    }
-
-    /// Visit each node in a possibly nested type definition to produce a type path.
-    ///
-    /// e.g `Result<GenericStruct<NestedGenericStruct<T>>, String>`
-    ///
-    /// if `original_name` is `Some(original_name)`, the resolved type needs to have the same `original_name`.
-    fn resolve_type_path_recurse(
-        &self,
-        id: u32,
-        is_field: bool,
-        parent_type_params: &[TypeParameter],
-        original_name: Option<&str>,
-    ) -> anyhow::Result<TypePath> {
-        if let Some(parent_type_param) = parent_type_params.iter().find(|tp| {
-            tp.concrete_type_id == id
-                && original_name.map_or(true, |original_name| tp.original_name == original_name)
-        }) {
-            let type_path = TypePath::from_parameter(parent_type_param.clone());
-            return Ok(type_path);
-        }
-
-        let mut ty = self.resolve_type(id)?;
-
-        if ty.path.ident() == Some("Cow".to_string()) {
-            let inner_ty_id = ty.type_params[0]
-                .ty
-                .ok_or_else(|| anyhow!("type parameters to Cow are not expected to be skipped"))?
-                .id;
-            ty = self.resolve_type(inner_ty_id)?
-        }
-
-        let params: Vec<TypePath> = ty
-            .type_params
-            .iter()
-            .filter_map(|f| {
-                f.ty.map(|f| self.resolve_type_path_recurse(f.id, false, parent_type_params, None))
-            })
-            .collect::<anyhow::Result<Vec<TypePath>>>()?;
-
-        let ty = match &ty.type_def {
-            TypeDef::Composite(_) | TypeDef::Variant(_) => {
-                self.type_path_maybe_with_substitutes(&ty.path, &params)
-            }
-            TypeDef::Primitive(primitive) => TypePathType::Primitive {
-                def: primitive.clone(),
-            },
-            TypeDef::Array(arr) => {
-                let inner_type = self.resolve_type_path_recurse(
-                    arr.type_param.id,
-                    false,
-                    parent_type_params,
-                    None,
-                )?;
-                TypePathType::Array {
-                    len: arr.len as usize,
-                    of: Box::new(inner_type),
-                }
-            }
-            TypeDef::Sequence(seq) => {
-                let inner_type = self.resolve_type_path_recurse(
-                    seq.type_param.id,
-                    false,
-                    parent_type_params,
-                    None,
-                )?;
-                TypePathType::Vec {
-                    of: Box::new(inner_type),
-                }
-            }
-            TypeDef::Tuple(tuple) => {
-                let elements = tuple
-                    .fields
-                    .iter()
-                    .map(|f| self.resolve_type_path_recurse(f.id, false, parent_type_params, None))
-                    .collect::<anyhow::Result<Vec<TypePath>>>()?;
-
-                TypePathType::Tuple { elements }
-            }
-            TypeDef::Compact(compact) => {
-                let inner_type = self.resolve_type_path_recurse(
-                    compact.type_param.id,
-                    false,
-                    parent_type_params,
-                    None,
-                )?;
-
-                TypePathType::Compact {
-                    inner: Box::new(inner_type),
-                    is_field,
-                }
-            }
-            TypeDef::BitSequence(bitseq) => {
-                let decoded_bits_type_path = self
-                    .settings
-                    .decoded_bits_type_path
-                    .as_ref()
-                    .ok_or_else(|| anyhow!("DecodedBits type path is None, cannot generate types with bit sequences."))?
-                    .clone();
-
-                let bit_order_type = self.resolve_type_path_recurse(
-                    bitseq.bit_order_type.id,
-                    false,
-                    parent_type_params,
-                    None,
-                )?;
-
-                let bit_store_type = self.resolve_type_path_recurse(
-                    bitseq.bit_store_type.id,
-                    false,
-                    parent_type_params,
-                    None,
-                )?;
-
-                TypePathType::BitVec {
-                    bit_order_type: Box::new(bit_order_type),
-                    bit_store_type: Box::new(bit_store_type),
-                    decoded_bits_type_path,
-                }
-            }
-        };
-        Ok(TypePath::from_type(ty))
-    }
-
-    pub fn type_path_maybe_with_substitutes(
-        &self,
-        path: &scale_info::Path<PortableForm>,
-        params: &Vec<TypePath>,
-    ) -> TypePathType {
-        // todo!("do substitutes here");
-
-        TypePathType::from_type_def_path(path, self.root_mod_ident.clone(), params.clone())
+    fn type_path_resolver(&self) -> TypePathResolver<'_> {
+        TypePathResolver::new(
+            &self.type_registry,
+            &self.settings.substitutes,
+            self.settings.decoded_bits_type_path.as_ref(),
+            &self.root_mod_ident,
+        )
     }
 }
