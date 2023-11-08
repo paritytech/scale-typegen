@@ -2,7 +2,7 @@ use proc_macro2::Span;
 use std::{borrow::Borrow, collections::HashMap};
 use syn::{parse_quote, spanned::Spanned as _};
 
-use super::{TypePath, TypePathType};
+use crate::typegen::type_path::{TypePath, TypePathType};
 
 /// A map of type substitutes. We match on the paths to generated types in order
 /// to figure out when to swap said type with some provided substitute.
@@ -206,7 +206,8 @@ impl TypeSubstitutes {
 
     /// Given a source type path, return whether a substitute exists for it.
     pub fn contains(&self, path: impl Into<PathSegments>) -> bool {
-        self.substitutes.contains_key(&path.into())
+        let path_segments: PathSegments = path.into();
+        self.substitutes.contains_key(&path_segments)
     }
 
     /// Given a source type path and the resolved, supplied type parameters,
@@ -390,7 +391,11 @@ fn is_absolute(path: &syn::Path) -> bool {
             .map_or(false, |segment| segment.ident == "crate")
 }
 
-pub struct AbsolutePath(pub syn::Path);
+pub fn absolute_path(path: syn::Path) -> Result<AbsolutePath, TypeSubstitutionError> {
+    path.try_into()
+}
+
+pub struct AbsolutePath(syn::Path);
 
 impl TryFrom<syn::Path> for AbsolutePath {
     type Error = TypeSubstitutionError;
