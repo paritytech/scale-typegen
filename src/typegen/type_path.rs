@@ -55,11 +55,11 @@ impl TypePath {
         }
     }
 
-    pub(crate) fn is_compact(&self) -> bool {
+    pub fn is_compact(&self) -> bool {
         matches!(&self.0, TypePathInner::Type(ty) if ty.is_compact())
     }
 
-    pub(crate) fn is_string(&self) -> bool {
+    pub fn is_string(&self) -> bool {
         matches!(&self.0, TypePathInner::Type(ty) if ty.is_string())
     }
 
