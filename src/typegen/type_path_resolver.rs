@@ -3,7 +3,7 @@ use scale_info::{form::PortableForm, PortableRegistry, Type, TypeDef};
 use syn::Ident;
 
 use super::{
-    substitutes::TypeSubstitutes,
+    settings::substitutes::TypeSubstitutes,
     type_path::{TypeParameter, TypePath, TypePathType},
 };
 

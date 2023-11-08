@@ -1,18 +1,15 @@
-pub mod types {
-    use super::types;
+pub mod my_types {
+    use super::my_types;
     pub mod scale_typegen {
-        use super::types;
-        pub mod typegen {
-            use super::types;
-            pub mod tests {
-                use super::types;
-                #[derive(:: parity_scale_codec :: Decode, :: parity_scale_codec :: Encode)]
-                pub struct A {
-                    pub a: ::std::collections::BTreeMap<
-                        ::core::primitive::u32,
-                        types::scale_typegen::typegen::tests::A,
-                    >,
-                }
+        use super::my_types;
+        pub mod tests {
+            use super::my_types;
+            #[derive(:: parity_scale_codec :: Decode, :: parity_scale_codec :: Emcode)]
+            pub struct A {
+                pub children: ::std::collections::HashMap<
+                    ::core::primitive::u32,
+                    my_types::scale_typegen::tests::A,
+                >,
             }
         }
     }

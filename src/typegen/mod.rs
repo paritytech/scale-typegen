@@ -1,8 +1,8 @@
 use self::{
-    derives::{Derives, DerivesRegistry},
-    module_ir::ModuleIR,
+    ir::module_ir::ModuleIR,
+    ir::type_ir::{CompositeFieldIR, CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
+    settings::derives::{Derives, DerivesRegistry},
     settings::TypeGeneratorSettings,
-    type_ir::{CompositeFieldIR, CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
     type_params::TypeParameters,
     type_path::{TypeParameter, TypePath, TypePathType},
     type_path_resolver::TypePathResolver,
@@ -12,17 +12,11 @@ use proc_macro2::Ident;
 use quote::{format_ident, quote};
 use scale_info::{form::PortableForm, PortableRegistry, PortableType, Type, TypeDef};
 
-pub mod derives;
-pub mod module_ir;
+pub mod ir;
 pub mod settings;
-pub mod substitutes;
-pub mod type_ir;
 pub mod type_params;
 pub mod type_path;
 pub mod type_path_resolver;
-
-#[cfg(test)]
-mod tests;
 
 pub struct TypeGenerator<'a> {
     type_registry: &'a PortableRegistry,
@@ -178,7 +172,7 @@ impl<'a> TypeGenerator<'a> {
                         .as_ref()
                         .map(|e| e.contains("Box<"))
                         .unwrap_or_default();
-                    dbg!(&is_boxed, &path);
+
                     for param in path.parent_type_params().iter() {
                         type_params.mark_used(param);
                     }
@@ -203,7 +197,7 @@ impl<'a> TypeGenerator<'a> {
                         .as_ref()
                         .map(|e| e.contains("Box<"))
                         .unwrap_or_default();
-                    dbg!(&is_boxed, &path);
+
                     for param in path.parent_type_params().iter() {
                         type_params.mark_used(param);
                     }

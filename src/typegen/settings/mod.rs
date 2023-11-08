@@ -1,10 +1,13 @@
+use derives::{Derives, DerivesRegistry};
 use parity_scale_codec::Compact;
+use proc_macro2::token_stream::IntoIter;
 use scale_info::{form::PortableForm, Type};
+use substitutes::TypeSubstitutes;
 
-use super::{
-    derives::{Derives, DerivesRegistry},
-    substitutes::TypeSubstitutes,
-};
+use self::substitutes::absolute_path;
+
+pub mod derives;
+pub mod substitutes;
 
 pub struct TypeGeneratorSettings {
     /// The name of the module which will contain the generated types.
@@ -36,6 +39,23 @@ impl Default for TypeGeneratorSettings {
 }
 
 impl TypeGeneratorSettings {
+    pub fn type_mod_name(mut self, type_mod_name: &str) -> Self {
+        self.type_mod_name = type_mod_name.into();
+        self
+    }
+
+    pub fn substitute(mut self, from: syn::Path, to: syn::Path) -> Self {
+        self.substitutes
+            .insert(from, absolute_path(to).unwrap())
+            .unwrap();
+        self
+    }
+
+    pub fn derive_on_all(mut self, derive_paths: impl IntoIterator<Item = syn::Path>) -> Self {
+        self.derives.extend_for_all(derive_paths, []);
+        self
+    }
+
     pub fn type_derives(&self, ty: &Type<PortableForm>) -> anyhow::Result<Derives> {
         let joined_path = ty.path.segments.join("::");
         let ty_path: syn::TypePath = syn::parse_str(&joined_path)?;

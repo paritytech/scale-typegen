@@ -1,10 +1,11 @@
-use super::{type_params::TypeParameters, type_path::TypePath};
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
 use scale_info::{form::PortableForm, Type};
 use syn::Item;
 
-use super::derives::Derives;
+use crate::typegen::{
+    settings::derives::Derives, type_params::TypeParameters, type_path::TypePath,
+};
 
 #[derive(Debug, Clone)]
 pub struct TypeIR {
