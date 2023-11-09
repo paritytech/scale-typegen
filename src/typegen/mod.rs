@@ -1,3 +1,5 @@
+use crate::Derives;
+
 use self::{
     ir::module_ir::ModuleIR,
     ir::type_ir::{CompositeFieldIR, CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
@@ -21,7 +23,7 @@ pub mod type_path_resolver;
 
 pub struct TypeGenerator<'a> {
     type_registry: &'a PortableRegistry,
-    settings: TypeGeneratorSettings,
+    pub settings: TypeGeneratorSettings,
     root_mod_ident: Ident,
 }
 
@@ -126,6 +128,7 @@ impl<'a> TypeGenerator<'a> {
         Ok(Some(type_ir))
     }
 
+    /// takes into account the settings value for `should_gen_docs`
     pub fn docs_from_scale_info(&self, docs: &[String]) -> TokenStream {
         self.settings
             .should_gen_docs
@@ -215,5 +218,18 @@ impl<'a> TypeGenerator<'a> {
             self.settings.decoded_bits_type_path.as_ref(),
             &self.root_mod_ident,
         )
+    }
+
+    pub fn upcast_composite(&self, composite: &CompositeIR) -> TypeIR {
+        TypeIR {
+            type_params: TypeParameters::from_scale_info(&[]),
+            derives: Derives::new(),
+            insert_codec_attributes: self.settings.insert_codec_attributes,
+            kind: TypeIRKind::Struct(composite.clone()),
+        }
+    }
+
+    pub fn default_derives(&self) -> &Derives {
+        self.settings.derives.default_derives()
     }
 }

@@ -11,13 +11,19 @@ pub struct DerivesRegistry {
     specific_type_derives: HashMap<syn::TypePath, Derives>,
 }
 
+impl Default for DerivesRegistry {
+    fn default() -> Self {
+        Self {
+            default_derives: Default::default(),
+            specific_type_derives: Default::default(),
+        }
+    }
+}
+
 impl DerivesRegistry {
     /// Creates a new `DerivesRegistry` with no default derives.
     pub fn new() -> Self {
-        Self {
-            default_derives: Derives::new(),
-            specific_type_derives: Default::default(),
-        }
+        Self::default()
     }
 
     /// Insert derives to be applied to all generated types.

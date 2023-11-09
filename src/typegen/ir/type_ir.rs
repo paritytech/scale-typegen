@@ -7,10 +7,10 @@ use crate::typegen::{
 
 #[derive(Debug, Clone)]
 pub struct TypeIR {
-    pub(crate) type_params: TypeParameters,
-    pub(crate) derives: Derives,
-    pub(crate) insert_codec_attributes: bool,
-    pub(crate) kind: TypeIRKind,
+    pub type_params: TypeParameters,
+    pub derives: Derives,
+    pub insert_codec_attributes: bool,
+    pub kind: TypeIRKind,
 }
 
 #[derive(Debug, Clone)]
