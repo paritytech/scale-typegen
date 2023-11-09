@@ -241,7 +241,7 @@ impl TypePathType {
                 syn::Type::Path(path)
             }
             TypePathType::Vec { of } => {
-                let type_path = parse_quote! { ::alloc::vec::Vec<#of> };
+                let type_path = parse_quote! { ::std::vec::Vec<#of> };
                 syn::Type::Path(type_path)
             }
             TypePathType::Array { len, of } => {

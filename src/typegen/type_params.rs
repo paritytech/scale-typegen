@@ -3,7 +3,8 @@
 // see LICENSE for license details.
 
 use super::TypeParameter;
-use quote::quote;
+use quote::{format_ident, quote};
+use scale_info::form::PortableForm;
 use std::collections::BTreeSet;
 
 /// Represents the set of generic type parameters for generating a type definition e.g. the `T` in
@@ -19,7 +20,22 @@ pub struct TypeParameters {
 
 impl TypeParameters {
     /// Create a new [`TypeParameters`] instance.
-    pub fn new(params: Vec<TypeParameter>) -> Self {
+    pub fn from_scale_info(params: &[scale_info::TypeParameter<PortableForm>]) -> Self {
+        let params = params
+            .iter()
+            .enumerate()
+            .filter_map(|(i, tp)| {
+                tp.ty.as_ref().map(|ty| {
+                    let tp_name = format_ident!("_{}", i);
+                    TypeParameter {
+                        concrete_type_id: ty.id,
+                        original_name: tp.name.clone(),
+                        name: tp_name,
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+
         let unused = params.iter().cloned().collect();
         Self { params, unused }
     }

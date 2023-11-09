@@ -182,7 +182,7 @@ impl<'a> TypePathResolver<'a> {
         Ok(TypePath::from_type(ty))
     }
 
-    fn type_path_maybe_with_substitutes(
+    pub fn type_path_maybe_with_substitutes(
         &self,
         path: &scale_info::Path<PortableForm>,
         params: &Vec<TypePath>,
@@ -194,7 +194,7 @@ impl<'a> TypePathResolver<'a> {
         }
     }
 
-    fn resolve_type(&self, id: u32) -> anyhow::Result<Type<PortableForm>> {
+    pub fn resolve_type(&self, id: u32) -> anyhow::Result<Type<PortableForm>> {
         let ty = self
             .registry
             .resolve(id)

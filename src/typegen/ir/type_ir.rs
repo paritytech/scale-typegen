@@ -9,8 +9,8 @@ use crate::typegen::{
 pub struct TypeIR {
     pub(crate) type_params: TypeParameters,
     pub(crate) derives: Derives,
+    pub(crate) insert_codec_attributes: bool,
     pub(crate) kind: TypeIRKind,
-    pub(crate) docs: TokenStream,
 }
 
 #[derive(Debug, Clone)]
@@ -26,16 +26,31 @@ impl TypeIR {
             TypeIRKind::Enum(e) => &e.name,
         }
     }
+
+    fn docs(&self) -> &TokenStream {
+        match &self.kind {
+            TypeIRKind::Struct(e) => &e.docs,
+            TypeIRKind::Enum(e) => &e.docs,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct CompositeIR {
-    pub(crate) name: Ident,
-    pub(crate) kind: CompositeIRKind,
+    pub name: Ident,
+    pub kind: CompositeIRKind,
+    pub docs: TokenStream,
+}
+
+impl CompositeIR {
+    pub fn new(name: Ident, kind: CompositeIRKind, docs: TokenStream) -> Self {
+        Self { name, kind, docs }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct EnumIR {
+    pub(crate) docs: TokenStream,
     pub(crate) name: Ident,
     pub(crate) variants: Vec<(u8, CompositeIR)>,
 }
@@ -49,9 +64,9 @@ pub enum CompositeIRKind {
 
 #[derive(Debug, Clone)]
 pub struct CompositeFieldIR {
-    type_path: TypePath,
-    is_compact: bool,
-    is_boxed: bool,
+    pub type_path: TypePath,
+    pub is_compact: bool,
+    pub is_boxed: bool,
 }
 
 impl CompositeFieldIR {
@@ -71,14 +86,15 @@ impl CompositeFieldIR {
 impl ToTokens for TypeIR {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let derives = &self.derives;
-        let docs = &self.docs;
         let type_params = &self.type_params;
+        let docs = self.docs();
         let ident = self.ident();
 
         match &self.kind {
             TypeIRKind::Struct(composite_ir) => {
                 let phantom_data = self.type_params.unused_params_phantom_data();
-                let fields = composite_ir.struct_field_tokens(phantom_data);
+                let fields =
+                    composite_ir.struct_field_tokens(phantom_data, self.insert_codec_attributes);
                 let trailing_semicolon = matches!(
                     composite_ir.kind,
                     CompositeIRKind::NoFields | CompositeIRKind::Unnamed(_)
@@ -99,17 +115,21 @@ impl ToTokens for TypeIR {
                     .map(|(index, composite)| {
                         let index = proc_macro2::Literal::u8_unsuffixed(*index);
                         let ident = &composite.name;
-                        let fields = composite.enum_field_tokens();
+                        let fields = composite.enum_field_tokens(self.insert_codec_attributes);
+                        let codec_index = self
+                            .insert_codec_attributes
+                            .then(|| quote!(#[codec(index = #index)]));
                         quote! {
-                            #[codec(index = #index)]
+                            #codec_index
                             #ident #fields
                         }
                     })
                     .collect::<Vec<_>>();
 
                 if let Some(phantom) = self.type_params.unused_params_phantom_data() {
+                    let codec_skip = self.insert_codec_attributes.then(|| quote!(#[codec(skip)]));
                     variants.push(quote! {
-                        #[codec(skip)]
+                        #codec_skip
                         __Ignore(#phantom)
                     })
                 }
@@ -128,7 +148,11 @@ impl ToTokens for TypeIR {
 }
 
 impl CompositeIR {
-    fn struct_field_tokens(&self, phantom_data: Option<syn::TypePath>) -> TokenStream {
+    fn struct_field_tokens(
+        &self,
+        phantom_data: Option<syn::TypePath>,
+        insert_codec_attributes: bool,
+    ) -> TokenStream {
         match &self.kind {
             CompositeIRKind::NoFields => {
                 if let Some(phantom_data) = phantom_data {
@@ -139,13 +163,14 @@ impl CompositeIR {
             }
             CompositeIRKind::Named(fields) => {
                 let fields = fields.iter().map(|(name, field)| {
-                    let compact_attr = field.compact_attr();
+                    let compact_attr = field.compact_attr().filter(|_| insert_codec_attributes);
                     quote! { #compact_attr pub #name: #field }
                 });
                 let marker = phantom_data.map(|phantom_data| {
+                    let codec_skip = insert_codec_attributes.then(|| quote!(#[codec(skip)]));
                     quote!(
-                        #[codec(skip)]
-                        pub __ignore: #phantom_data
+                        #codec_skip
+                        __ignore: #phantom_data
                     )
                 });
                 quote!(
@@ -157,18 +182,19 @@ impl CompositeIR {
             }
             CompositeIRKind::Unnamed(fields) => {
                 let fields = fields.iter().map(|field| {
-                    let compact_attr = field.compact_attr();
+                    let compact_attr = field.compact_attr().filter(|_| insert_codec_attributes);
                     quote! { #compact_attr pub #field }
                 });
                 let marker = phantom_data.map(|phantom_data| {
+                    let codec_skip = insert_codec_attributes.then(|| quote!(#[codec(skip)]));
                     quote!(
-                        #[codec(skip)]
-                        pub __ignore #phantom_data
+                        #codec_skip
+                        #phantom_data
                     )
                 });
                 quote! {
                     (
-                        #( #fields ),*
+                        #( #fields, )*
                         #marker
                     )
                 }
@@ -176,22 +202,22 @@ impl CompositeIR {
         }
     }
 
-    fn enum_field_tokens(&self) -> TokenStream {
+    fn enum_field_tokens(&self, insert_codec_attributes: bool) -> TokenStream {
         match &self.kind {
             CompositeIRKind::NoFields => quote! {},
             CompositeIRKind::Named(ref fields) => {
                 let fields = fields.iter().map(|(name, field)| {
-                    let compact_attr = field.compact_attr();
+                    let compact_attr = field.compact_attr().filter(|_| insert_codec_attributes);
                     quote! { #compact_attr #name: #field }
                 });
                 quote!( { #( #fields, )* } )
             }
             CompositeIRKind::Unnamed(ref fields) => {
                 let fields = fields.iter().map(|field| {
-                    let compact_attr = field.compact_attr();
+                    let compact_attr = field.compact_attr().filter(|_| insert_codec_attributes);
                     quote! { #compact_attr #field }
                 });
-                quote! { ( #( #fields ),* ) }
+                quote! { ( #( #fields, )* ) }
             }
         }
     }
