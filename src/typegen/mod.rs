@@ -3,13 +3,15 @@ use self::{
     ir::type_ir::{CompositeFieldIR, CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
     settings::TypeGeneratorSettings,
     type_params::TypeParameters,
-    type_path::{TypeParameter},
+    type_path::TypeParameter,
     type_path_resolver::TypePathResolver,
 };
 use anyhow::anyhow;
-use proc_macro2::Ident;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use scale_info::{form::PortableForm, PortableRegistry, PortableType, TypeDef};
+
+pub type TypeGenerationError = anyhow::Error;
 
 pub mod ir;
 pub mod settings;
@@ -35,6 +37,10 @@ impl<'a> TypeGenerator<'a> {
             settings,
             root_mod_ident,
         })
+    }
+
+    pub fn types_mod_ident(&self) -> &Ident {
+        &self.root_mod_ident
     }
 
     /// Generate a module containing all types defined in the supplied type registry.
@@ -74,22 +80,7 @@ impl<'a> TypeGenerator<'a> {
             return Ok(None);
         }
 
-        let type_params = ty
-            .type_params
-            .iter()
-            .enumerate()
-            .filter_map(|(i, tp)| {
-                tp.ty.as_ref().map(|ty| {
-                    let tp_name = format_ident!("_{}", i);
-                    TypeParameter {
-                        concrete_type_id: ty.id,
-                        original_name: tp.name.clone(),
-                        name: tp_name,
-                    }
-                })
-            })
-            .collect::<Vec<_>>();
-        let mut type_params = TypeParameters::new(type_params);
+        let mut type_params = TypeParameters::from_scale_info(&ty.type_params);
 
         let name = ty
             .path
@@ -97,10 +88,12 @@ impl<'a> TypeGenerator<'a> {
             .map(|e| syn::parse_str::<Ident>(&e))
             .ok_or_else(|| anyhow!("Structs and enums should have names"))??;
 
+        let docs = self.docs_from_scale_info(&ty.docs);
+
         let kind = match &ty.type_def {
             TypeDef::Composite(composite) => {
                 let kind = self.create_composite_ir_kind(&composite.fields, &mut type_params)?;
-                TypeIRKind::Struct(CompositeIR { name, kind })
+                TypeIRKind::Struct(CompositeIR { name, kind, docs })
             }
             TypeDef::Variant(variant) => {
                 let variants = variant
@@ -109,33 +102,38 @@ impl<'a> TypeGenerator<'a> {
                     .map(|v| {
                         let name = syn::parse_str::<Ident>(&v.name)?;
                         let kind = self.create_composite_ir_kind(&v.fields, &mut type_params)?;
-                        Ok((v.index, CompositeIR { kind, name }))
+                        let docs = self.docs_from_scale_info(&v.docs);
+                        Ok((v.index, CompositeIR { kind, name, docs }))
                     })
                     .collect::<anyhow::Result<Vec<(u8, CompositeIR)>>>()?;
-                TypeIRKind::Enum(EnumIR { name, variants })
+                TypeIRKind::Enum(EnumIR {
+                    name,
+                    variants,
+                    docs,
+                })
             }
             _ => unreachable!("Other variants early return before. qed."),
         };
 
         let derives = self.settings.type_derives(ty)?;
 
-        let docs = &ty.docs;
-        let docs = self
-            .settings
-            .should_gen_docs
-            .then_some(quote! { #( #[doc = #docs ] )* })
-            .unwrap_or_default();
-
         let type_ir = TypeIR {
             kind,
             derives,
-            docs,
             type_params,
+            insert_codec_attributes: self.settings.insert_codec_attributes,
         };
         Ok(Some(type_ir))
     }
 
-    fn create_composite_ir_kind(
+    pub fn docs_from_scale_info(&self, docs: &[String]) -> TokenStream {
+        self.settings
+            .should_gen_docs
+            .then_some(quote! { #( #[doc = #docs ] )* })
+            .unwrap_or_default()
+    }
+
+    pub fn create_composite_ir_kind(
         &self,
         fields: &[scale_info::Field<PortableForm>],
         type_params: &mut TypeParameters,
@@ -210,7 +208,7 @@ impl<'a> TypeGenerator<'a> {
         }
     }
 
-    fn type_path_resolver(&self) -> TypePathResolver<'_> {
+    pub fn type_path_resolver(&self) -> TypePathResolver<'_> {
         TypePathResolver::new(
             self.type_registry,
             &self.settings.substitutes,

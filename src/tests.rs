@@ -6,35 +6,6 @@ use syn::parse_quote;
 
 use crate::typegen::{settings::TypeGeneratorSettings, TypeGenerator};
 
-mod nested {
-    use parity_scale_codec::Compact;
-    use scale_info::TypeInfo;
-
-    #[derive(TypeInfo)]
-    pub enum Animal {
-        Cat,
-        Ant(bool),
-        Monkey {
-            favorite_food: Food,
-            length: Centimeter,
-        },
-        Chimera {
-            base: Box<Animal>,
-            mutations: Box<Animal>,
-        },
-    }
-
-    #[derive(TypeInfo)]
-    pub struct Centimeter(Compact<u16>);
-
-    #[derive(TypeInfo)]
-    pub enum Food {
-        Banana,
-        Orange,
-        Apple,
-    }
-}
-
 #[derive(TypeInfo)]
 pub struct Person {
     name: Box<String>,
@@ -110,6 +81,7 @@ fn substitutes_and_derives_work() {
 fn different_structures_work() {
     #[derive(TypeInfo)]
     pub enum Animal {
+        #[codec(index = 99)]
         Cat,
         Ant(bool),
         Monkey {
@@ -145,7 +117,7 @@ fn different_structures_work() {
                 pub mod tests {
                     use super::types;
                     pub enum Animal {
-                        #[codec(index = 0)]
+                        #[codec(index = 99)]
                         Cat,
                         #[codec(index = 1)]
                         Ant(::core::primitive::bool),
