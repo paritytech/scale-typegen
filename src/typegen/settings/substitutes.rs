@@ -12,7 +12,7 @@ pub struct TypeSubstitutes {
 }
 
 #[derive(Debug)]
-struct Substitute {
+pub struct Substitute {
     path: syn::Path,
     param_mapping: TypeParamMapping,
 }

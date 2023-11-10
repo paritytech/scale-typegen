@@ -11,7 +11,10 @@ use self::{
 use anyhow::anyhow;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
-use scale_info::{form::PortableForm, PortableRegistry, PortableType, TypeDef};
+use scale_info::{
+    form::PortableForm, PortableRegistry, PortableType, Type, TypeDef, TypeDefPrimitive,
+};
+use syn::parse_quote;
 
 pub type TypeGenerationError = anyhow::Error;
 
@@ -117,7 +120,7 @@ impl<'a> TypeGenerator<'a> {
             _ => unreachable!("Other variants early return before. qed."),
         };
 
-        let derives = self.settings.type_derives(ty)?;
+        let derives = self.type_derives(ty)?;
 
         let type_ir = TypeIR {
             kind,
@@ -231,5 +234,41 @@ impl<'a> TypeGenerator<'a> {
 
     pub fn default_derives(&self) -> &Derives {
         self.settings.derives.default_derives()
+    }
+
+    pub fn type_derives(&self, ty: &Type<PortableForm>) -> anyhow::Result<Derives> {
+        let joined_path = ty.path.segments.join("::");
+        let ty_path: syn::TypePath = syn::parse_str(&joined_path)?;
+        let mut derives = self.settings.derives.resolve(&ty_path);
+        // if the type is a single field struct with a concrete unsigned int type in it,
+        // also add CompactAs to the derives
+        if let TypeDef::Composite(composite) = &ty.type_def {
+            if composite.fields.len() == 1 {
+                let field = &composite.fields[0];
+                if !ty
+                    .type_params
+                    .iter()
+                    .any(|tp| Some(&tp.name) == field.type_name.as_ref())
+                {
+                    let field_ty = self.type_path_resolver().resolve_type(field.ty.id)?;
+                    if matches!(
+                        field_ty.type_def,
+                        TypeDef::Primitive(
+                            TypeDefPrimitive::U8
+                                | TypeDefPrimitive::U16
+                                | TypeDefPrimitive::U32
+                                | TypeDefPrimitive::U64
+                                | TypeDefPrimitive::U128
+                        )
+                    ) {
+                        if let Some(compact_as_type_path) = &self.settings.compact_as_type_path {
+                            derives.insert_derive(parse_quote!(#compact_as_type_path));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(derives)
     }
 }
