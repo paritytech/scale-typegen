@@ -10,7 +10,7 @@ use self::{
 };
 use anyhow::anyhow;
 use proc_macro2::{Ident, TokenStream};
-use quote::{format_ident, quote};
+use quote::{quote};
 use scale_info::{
     form::PortableForm, PortableRegistry, PortableType, Type, TypeDef, TypeDefPrimitive,
 };
