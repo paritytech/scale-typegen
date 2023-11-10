@@ -62,7 +62,6 @@ fn substitutes_and_derives_work() {
 fn different_structures_work() {
     #[derive(TypeInfo)]
     pub enum Animal {
-        #[codec(index = 99)]
         Cat,
         Ant(bool),
         Monkey {
@@ -95,28 +94,21 @@ fn different_structures_work() {
                 pub mod tests {
                     use super::types;
                     pub enum Animal {
-                        #[codec(index = 99)]
                         Cat,
-                        #[codec(index = 1)]
-                        Ant(::core::primitive::bool),
-                        #[codec(index = 2)]
+                        Ant(::core::primitive::bool,),
                         Monkey {
                             favorite_food: types::scale_typegen::tests::Food,
                             length: types::scale_typegen::tests::Centimeter,
                         },
-                        #[codec(index = 3)]
                         Chimera {
                             base: ::std::boxed::Box<types::scale_typegen::tests::Animal>,
                             mutations: ::std::boxed::Box<types::scale_typegen::tests::Animal>,
                         },
                     }
-                    pub struct Centimeter(#[codec(compact)] pub ::core::primitive::u16);
+                    pub struct Centimeter(pub ::core::primitive::u16,);
                     pub enum Food {
-                        #[codec(index = 0)]
                         Banana,
-                        #[codec(index = 1)]
                         Orange,
-                        #[codec(index = 2)]
                         Apple,
                     }
                 }
