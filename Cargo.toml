@@ -2,8 +2,11 @@
 name = "scale-typegen"
 version = "0.0.1"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Parity Technologies <admin@parity.io>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/paritytech/scale-typegen"
+description = "Type Generation for SCALE encoded Rust Types"
 
 [dependencies]
 anyhow = "1.0.75"
