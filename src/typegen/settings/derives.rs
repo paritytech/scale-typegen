@@ -6,19 +6,13 @@ use quote::ToTokens;
 /// a combination of some common derives for all types, plus type
 /// specific derives.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct DerivesRegistry {
     default_derives: Derives,
     specific_type_derives: HashMap<syn::TypePath, Derives>,
 }
 
-impl Default for DerivesRegistry {
-    fn default() -> Self {
-        Self {
-            default_derives: Default::default(),
-            specific_type_derives: Default::default(),
-        }
-    }
-}
+
 
 impl DerivesRegistry {
     /// Creates a new `DerivesRegistry` with no default derives.

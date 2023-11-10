@@ -1,6 +1,6 @@
-use derives::{Derives, DerivesRegistry};
+use derives::{DerivesRegistry};
 
-use scale_info::{form::PortableForm, Type};
+
 use substitutes::TypeSubstitutes;
 
 use self::substitutes::absolute_path;

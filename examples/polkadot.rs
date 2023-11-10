@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use scale_info::PortableRegistry;
-use scale_typegen::typegen::{settings::TypeGeneratorSettings, TypeGenerator};
+use scale_typegen::{TypeGenerator, TypeGeneratorSettings};
 use serde_json::Value;
 use syn::parse_quote;
 

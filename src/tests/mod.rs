@@ -1,12 +1,12 @@
 use parity_scale_codec::Compact;
-use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
-use scale_info::{PortableRegistry, TypeInfo};
+
+use quote::{quote};
+use scale_info::{TypeInfo};
 use syn::parse_quote;
 
 use crate::{
     tests::utils::{subxt_settings, Codegen},
-    typegen::{settings::TypeGeneratorSettings, TypeGenerator},
+    typegen::{settings::TypeGeneratorSettings},
 };
 
 mod utils;
