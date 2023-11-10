@@ -24,6 +24,7 @@ pub mod type_params;
 pub mod type_path;
 pub mod type_path_resolver;
 
+/// An interface for generating a types module.
 pub struct TypeGenerator<'a> {
     type_registry: &'a PortableRegistry,
     pub settings: TypeGeneratorSettings,
