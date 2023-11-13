@@ -11,9 +11,7 @@ use self::{
 use anyhow::anyhow;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use scale_info::{
-    form::PortableForm, PortableRegistry, PortableType, Type, TypeDef, TypeDefPrimitive,
-};
+use scale_info::{form::PortableForm, PortableRegistry, PortableType, Type, TypeDef};
 use syn::parse_quote;
 
 pub type TypeGenerationError = anyhow::Error;

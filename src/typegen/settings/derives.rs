@@ -5,14 +5,11 @@ use quote::ToTokens;
 /// A struct containing the derives that we'll be applying to types;
 /// a combination of some common derives for all types, plus type
 /// specific derives.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct DerivesRegistry {
     default_derives: Derives,
     specific_type_derives: HashMap<syn::TypePath, Derives>,
 }
-
-
 
 impl DerivesRegistry {
     /// Creates a new `DerivesRegistry` with no default derives.
