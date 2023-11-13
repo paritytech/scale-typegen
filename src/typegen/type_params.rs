@@ -56,7 +56,7 @@ impl TypeParameters {
             let params = self.unused.iter();
             quote! { ( #( #params ), * ) }
         };
-        Some(syn::parse_quote! { ::core::marker::PhantomData<#params> })
+        Some(syn::parse_quote! {::core::marker::PhantomData<#params> })
     }
 
     /// Returns the set of type parameters.

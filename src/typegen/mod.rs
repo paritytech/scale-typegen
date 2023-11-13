@@ -10,7 +10,7 @@ use self::{
 };
 use anyhow::anyhow;
 use proc_macro2::{Ident, TokenStream};
-use quote::{quote};
+use quote::quote;
 use scale_info::{
     form::PortableForm, PortableRegistry, PortableType, Type, TypeDef, TypeDefPrimitive,
 };
@@ -220,6 +220,7 @@ impl<'a> TypeGenerator<'a> {
             self.type_registry,
             &self.settings.substitutes,
             self.settings.decoded_bits_type_path.as_ref(),
+            self.settings.compact_type_path.as_ref(),
             &self.root_mod_ident,
         )
     }

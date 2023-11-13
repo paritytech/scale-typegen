@@ -7,6 +7,7 @@ use scale_typegen::{TypeGenerator, TypeGeneratorSettings};
 use serde_json::Value;
 use syn::parse_quote;
 
+#[allow(unused)]
 pub struct DecodedBits<Store, Order> {
     bits: scale_bits::Bits,
     _marker: PhantomData<(Store, Order)>,

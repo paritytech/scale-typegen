@@ -11,6 +11,7 @@ pub struct TypePathResolver<'a> {
     registry: &'a PortableRegistry,
     substitutes: &'a TypeSubstitutes,
     decoded_bits_type_path: Option<&'a syn::Path>,
+    compact_type_path: Option<&'a syn::Path>,
     root_mod_ident: &'a Ident,
 }
 
@@ -19,6 +20,7 @@ impl<'a> TypePathResolver<'a> {
         registry: &'a PortableRegistry,
         substitutes: &'a TypeSubstitutes,
         decoded_bits_type_path: Option<&'a syn::Path>,
+        compact_type_path: Option<&'a syn::Path>,
         root_mod_ident: &'a Ident,
     ) -> Self {
         Self {
@@ -26,6 +28,7 @@ impl<'a> TypePathResolver<'a> {
             substitutes,
             decoded_bits_type_path,
             root_mod_ident,
+            compact_type_path,
         }
     }
 
@@ -148,14 +151,24 @@ impl<'a> TypePathResolver<'a> {
                     None,
                 )?;
 
+                let compact_type_path = self
+                    .compact_type_path
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "compact_type_path is None, cannot generate code for compact types."
+                        )
+                    })?
+                    .clone();
+
                 TypePathType::Compact {
                     inner: Box::new(inner_type),
                     is_field,
+                    compact_type_path,
                 }
             }
             TypeDef::BitSequence(bitseq) => {
                 let decoded_bits_type_path = self.decoded_bits_type_path
-                    .ok_or_else(|| anyhow!("DecodedBits type path is None, cannot generate types with bit sequences."))?
+                    .ok_or_else(|| anyhow!("decoded_bits_type_path is None, cannot generate code with bit sequences."))?
                     .clone();
 
                 let bit_order_type = self.resolve_type_path_recurse(

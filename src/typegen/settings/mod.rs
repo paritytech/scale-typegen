@@ -1,5 +1,4 @@
-use derives::{DerivesRegistry};
-
+use derives::DerivesRegistry;
 
 use substitutes::TypeSubstitutes;
 
@@ -26,6 +25,10 @@ pub struct TypeGeneratorSettings {
     /// TypePath to the CompactAs trait/derive macro.
     /// E.g. `subxt::ext::codec::CompactAs`
     pub compact_as_type_path: Option<syn::Path>,
+    /// TypePath to the Compact<T> struct.
+    /// E.g. `subxt::ext::codec::Compact`
+    pub compact_type_path: Option<syn::Path>,
+
     /// If false, no codec attributes like `codec(index=0)` and `codec(compact)` are inserted.
     /// This is a useful option if we do not want to derive Decode and Encode on our types.
     pub insert_codec_attributes: bool,
@@ -40,6 +43,7 @@ impl Default for TypeGeneratorSettings {
             derives: DerivesRegistry::new(),
             decoded_bits_type_path: None,
             compact_as_type_path: None,
+            compact_type_path: None,
             insert_codec_attributes: false,
         }
     }

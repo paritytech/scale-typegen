@@ -125,6 +125,7 @@ pub enum TypePathType {
     Compact {
         inner: Box<TypePath>,
         is_field: bool,
+        compact_type_path: syn::Path,
     },
     BitVec {
         bit_order_type: Box<TypePath>,
@@ -269,13 +270,17 @@ impl TypePathType {
                 TypeDefPrimitive::I128 => parse_quote!(::core::primitive::i128),
                 TypeDefPrimitive::I256 => unimplemented!("not a rust primitive"),
             }),
-            TypePathType::Compact { inner, is_field } => {
+            TypePathType::Compact {
+                inner,
+                is_field,
+                compact_type_path,
+            } => {
                 let path = if *is_field {
                     // compact fields can use the inner compact type directly and be annotated with
                     // the `compact` attribute e.g. `#[codec(compact)] my_compact_field: u128`
                     parse_quote! ( #inner )
                 } else {
-                    parse_quote! ( parity_scale_codec::Compact<#inner> )
+                    parse_quote! ( #compact_type_path<#inner> )
                 };
                 syn::Type::Path(path)
             }
