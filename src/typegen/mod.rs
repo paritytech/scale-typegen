@@ -96,9 +96,15 @@ impl<'a> TypeGenerator<'a> {
 
         let docs = self.docs_from_scale_info(&ty.docs);
 
+        let mut could_derive_as_compact: bool = false;
         let kind = match &ty.type_def {
             TypeDef::Composite(composite) => {
                 let kind = self.create_composite_ir_kind(&composite.fields, &mut type_params)?;
+
+                if kind.could_derive_as_compact() {
+                    could_derive_as_compact = true;
+                }
+
                 TypeIRKind::Struct(CompositeIR { name, kind, docs })
             }
             TypeDef::Variant(variant) => {
@@ -121,7 +127,10 @@ impl<'a> TypeGenerator<'a> {
             _ => unreachable!("Other variants early return before. qed."),
         };
 
-        let derives = self.type_derives(ty)?;
+        let mut derives = self.type_derives(ty)?;
+        if could_derive_as_compact {
+            self.add_as_compact_derive(&mut derives);
+        }
 
         let type_ir = TypeIR {
             kind,
@@ -226,9 +235,14 @@ impl<'a> TypeGenerator<'a> {
     }
 
     pub fn upcast_composite(&self, composite: &CompositeIR) -> TypeIR {
+        // just use Default Derives + AsCompact. No access to type specific derives here. (Mainly used in subxt to create structs from enum variants...)
+        let mut derives = self.settings.derives.default_derives().clone();
+        if composite.kind.could_derive_as_compact() {
+            self.add_as_compact_derive(&mut derives)
+        }
         TypeIR {
             type_params: TypeParameters::from_scale_info(&[]),
-            derives: Derives::new(),
+            derives,
             insert_codec_attributes: self.settings.insert_codec_attributes,
             kind: TypeIRKind::Struct(composite.clone()),
         }
@@ -241,36 +255,14 @@ impl<'a> TypeGenerator<'a> {
     pub fn type_derives(&self, ty: &Type<PortableForm>) -> anyhow::Result<Derives> {
         let joined_path = ty.path.segments.join("::");
         let ty_path: syn::TypePath = syn::parse_str(&joined_path)?;
-        let mut derives = self.settings.derives.resolve(&ty_path);
-        // if the type is a single field struct with a concrete unsigned int type in it,
-        // also add CompactAs to the derives
-        if let TypeDef::Composite(composite) = &ty.type_def {
-            if composite.fields.len() == 1 {
-                let field = &composite.fields[0];
-                if !ty
-                    .type_params
-                    .iter()
-                    .any(|tp| Some(&tp.name) == field.type_name.as_ref())
-                {
-                    let field_ty = self.type_path_resolver().resolve_type(field.ty.id)?;
-                    if matches!(
-                        field_ty.type_def,
-                        TypeDef::Primitive(
-                            TypeDefPrimitive::U8
-                                | TypeDefPrimitive::U16
-                                | TypeDefPrimitive::U32
-                                | TypeDefPrimitive::U64
-                                | TypeDefPrimitive::U128
-                        )
-                    ) {
-                        if let Some(compact_as_type_path) = &self.settings.compact_as_type_path {
-                            derives.insert_derive(parse_quote!(#compact_as_type_path));
-                        }
-                    }
-                }
-            }
-        }
-
+        let derives = self.settings.derives.resolve(&ty_path);
         Ok(derives)
+    }
+
+    /// Adds a AsCompact derive, if a path to AsCompact trait/derive macro set in settings.
+    fn add_as_compact_derive(&self, derives: &mut Derives) {
+        if let Some(compact_as_type_path) = &self.settings.compact_as_type_path {
+            derives.insert_derive(parse_quote!(#compact_as_type_path));
+        }
     }
 }
