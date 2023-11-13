@@ -62,6 +62,28 @@ pub enum CompositeIRKind {
     Unnamed(Vec<CompositeFieldIR>),
 }
 
+impl CompositeIRKind {
+    pub fn could_derive_as_compact(&self) -> bool {
+        // has to have only a single field:
+        let single_field = match self {
+            CompositeIRKind::NoFields => return false,
+            CompositeIRKind::Named(fields) => {
+                if fields.len() != 1 {
+                    return false;
+                }
+                &fields[0].1
+            }
+            CompositeIRKind::Unnamed(fields) => {
+                if fields.len() != 1 {
+                    return false;
+                }
+                &fields[0]
+            }
+        };
+        single_field.type_path.is_uint_up_to_u128()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CompositeFieldIR {
     pub type_path: TypePath,
@@ -115,21 +137,23 @@ impl ToTokens for TypeIR {
                     .map(|(index, composite)| {
                         let index = proc_macro2::Literal::u8_unsuffixed(*index);
                         let ident = &composite.name;
+                        let variant_docs = &composite.docs;
                         let fields = composite.enum_field_tokens(self.insert_codec_attributes);
                         let codec_index = self
                             .insert_codec_attributes
                             .then(|| quote!(#[codec(index = #index)]));
                         quote! {
                             #codec_index
+                            #variant_docs
                             #ident #fields
                         }
                     })
                     .collect::<Vec<_>>();
 
                 if let Some(phantom) = self.type_params.unused_params_phantom_data() {
-                    let codec_skip = self.insert_codec_attributes.then(|| quote!(#[codec(skip)]));
+                    // Note: not sure if a #[codec(skip)] is appropriate here or not.
+                    // let codec_skip = self.insert_codec_attributes.then(|| quote!(#[codec(skip)]));
                     variants.push(quote! {
-                        #codec_skip
                         __Ignore(#phantom)
                     })
                 }

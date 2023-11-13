@@ -63,6 +63,19 @@ impl TypePath {
         matches!(&self.0, TypePathInner::Type(ty) if ty.is_string())
     }
 
+    pub fn is_uint_up_to_u128(&self) -> bool {
+        matches!(
+            &self.0,
+            TypePathInner::Type(TypePathType::Primitive {
+                def: TypeDefPrimitive::U8
+                    | TypeDefPrimitive::U16
+                    | TypeDefPrimitive::U32
+                    | TypeDefPrimitive::U64
+                    | TypeDefPrimitive::U128
+            })
+        )
+    }
+
     /// Returns the type parameters in a path which are inherited from the containing type.
     ///
     /// # Example
