@@ -156,7 +156,7 @@ impl CompositeIR {
         match &self.kind {
             CompositeIRKind::NoFields => {
                 if let Some(phantom_data) = phantom_data {
-                    quote! { ( #phantom_data ) }
+                    quote! { ( pub #phantom_data ) }
                 } else {
                     quote! {}
                 }
@@ -170,7 +170,7 @@ impl CompositeIR {
                     let codec_skip = insert_codec_attributes.then(|| quote!(#[codec(skip)]));
                     quote!(
                         #codec_skip
-                        __ignore: #phantom_data
+                        pub __ignore: #phantom_data
                     )
                 });
                 quote!(
@@ -189,7 +189,7 @@ impl CompositeIR {
                     let codec_skip = insert_codec_attributes.then(|| quote!(#[codec(skip)]));
                     quote!(
                         #codec_skip
-                        #phantom_data
+                        pub #phantom_data
                     )
                 });
                 quote! {

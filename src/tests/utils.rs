@@ -55,6 +55,7 @@ pub(super) fn subxt_settings() -> TypeGeneratorSettings {
         decoded_bits_type_path: Some(parse_quote!(::subxt_path::utils::bits::DecodedBits)),
         insert_codec_attributes: true,
         compact_as_type_path: Some(parse_quote!(::subxt_path::ext::codec::CompactAs)),
+        compact_type_path: Some(parse_quote!(::subxt_path::ext::codec::Compact)),
     }
 }
 /// Derives mirroring the subxt default derives
