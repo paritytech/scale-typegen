@@ -15,7 +15,7 @@ pub enum TypegenError {
     DecodedBitsPathNone,
     #[error("Could not find type with ID {0} in the type registry.")]
     TypeNotFound(u32),
-    #[error("Could not substitute type: {0}")]
+    #[error("Type substitution error: {0}")]
     InvalidSubstitute(#[from] TypeSubstitutionError),
 }
 
@@ -31,7 +31,7 @@ impl std::fmt::Display for TypeSubstitutionError {
         &self,
         f: &mut scale_info::prelude::fmt::Formatter<'_>,
     ) -> scale_info::prelude::fmt::Result {
-        f.write_fmt(format_args!("{:?}", self))
+        f.write_fmt(format_args!("{}", self.kind))
     }
 }
 
