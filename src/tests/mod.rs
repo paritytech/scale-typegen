@@ -6,7 +6,7 @@ use scale_info::TypeInfo;
 use syn::parse_quote;
 
 use crate::{
-    tests::utils::{subxt_settings, Codegen},
+    tests::utils::{subxt_settings, Testgen},
     typegen::settings::TypeGeneratorSettings,
     DerivesRegistry, TypeSubstitutes,
 };
@@ -35,7 +35,7 @@ fn substitutes_and_derives() {
     }
 
     // check the generated code
-    let code = Codegen::new().with::<A>().gen(settings).unwrap();
+    let code = Testgen::new().with::<A>().gen(settings);
     let expected_code = quote! {
         pub mod my_types {
             use super::my_types;
@@ -87,7 +87,7 @@ fn can_omit_compact_encoding() {
         insert_codec_attributes: false, // this results in #[codec(compact)] not being inserted for the compact field of `Centimeter`.
         ..Default::default()
     };
-    let code = Codegen::new().with::<Animal>().gen(settings).unwrap();
+    let code = Testgen::new().with::<Animal>().gen(settings);
 
     let expected_code = quote! {
         pub mod types {
@@ -131,10 +131,7 @@ fn generate_struct_with_primitives() {
         c: char,
     }
 
-    let code = Codegen::new()
-        .with::<S>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<S>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -170,10 +167,9 @@ fn generate_struct_with_a_struct_field() {
         a: i32,
     }
 
-    let code = Codegen::new()
+    let code = Testgen::new()
         .with::<Parent>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+        .gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -211,10 +207,9 @@ fn generate_tuple_struct() {
     #[derive(TypeInfo)]
     struct Child(i32);
 
-    let code = Codegen::new()
+    let code = Testgen::new()
         .with::<Parent>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+        .gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -280,7 +275,7 @@ fn derive_compact_as_for_uint_wrapper_structs() {
     #[derive(TypeInfo)]
     struct TSu128(u128);
 
-    let code = Codegen::new()
+    let code = Testgen::new()
         .with::<Su8>()
         .with::<TSu8>()
         .with::<Su16>()
@@ -291,8 +286,7 @@ fn derive_compact_as_for_uint_wrapper_structs() {
         .with::<TSu64>()
         .with::<Su128>()
         .with::<TSu128>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+        .gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -373,10 +367,7 @@ fn generate_enum() {
         C { a: u32 },
     }
 
-    let code = Codegen::new()
-        .with::<E>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<E>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -422,12 +413,11 @@ fn compact_fields() {
         B(#[codec(compact)] u32),
     }
 
-    let code = Codegen::new()
+    let code = Testgen::new()
         .with::<S>()
         .with::<TupleStruct>()
         .with::<E>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+        .gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -479,10 +469,7 @@ fn compact_generic_parameter() {
         tuple: (Compact<u8>, Compact<u16>),
     }
 
-    let code = Codegen::new()
-        .with::<S>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<S>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -513,10 +500,7 @@ fn generate_array_field() {
         a: [u8; 32],
     }
 
-    let code = Codegen::new()
-        .with::<S>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<S>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -543,10 +527,7 @@ fn option_fields() {
         b: Option<u32>,
     }
 
-    let code = Codegen::new()
-        .with::<S>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<S>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -576,10 +557,7 @@ fn box_fields_struct() {
         b: Box<u32>,
     }
 
-    let code = Codegen::new()
-        .with::<S>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<S>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -609,10 +587,7 @@ fn box_fields_enum() {
         B { a: Box<u32> },
     }
 
-    let code = Codegen::new()
-        .with::<E>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<E>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -642,10 +617,7 @@ fn range_fields() {
         b: core::ops::RangeInclusive<u32>,
     }
 
-    let code = Codegen::new()
-        .with::<S>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<S>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -679,10 +651,7 @@ fn generics() {
         c: Foo<u8>,
     }
 
-    let code = Codegen::new()
-        .with::<Bar>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<Bar>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -723,10 +692,9 @@ fn generics_nested() {
         b: Foo<T, u32>,
     }
 
-    let code = Codegen::new()
+    let code = Testgen::new()
         .with::<Bar<bool>>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+        .gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -767,10 +735,7 @@ fn generate_bitvec() {
         msb: BitVec<u16, Msb0>,
     }
 
-    let code = Codegen::new()
-        .with::<S>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<S>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -812,11 +777,10 @@ fn generics_with_alias_adds_phantom_data_marker() {
     #[derive(TypeInfo)]
     struct UnnamedFields<T: Trait, U: Trait>(Bar<T, U>);
 
-    let code = Codegen::new()
+    let code = Testgen::new()
         .with::<NamedFields<bool>>()
         .with::<UnnamedFields<bool, bool>>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+        .gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -871,10 +835,9 @@ fn modules() {
         }
     }
 
-    let code = Codegen::new()
+    let code = Testgen::new()
         .with::<m::c::Foo>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+        .gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -927,10 +890,7 @@ fn dont_force_struct_names_camel_case() {
     #[derive(TypeInfo)]
     struct AB;
 
-    let code = Codegen::new()
-        .with::<AB>()
-        .gen_tests_mod(subxt_settings())
-        .unwrap();
+    let code = Testgen::new().with::<AB>().gen_tests_mod(subxt_settings());
 
     let expected_code = quote! {
         pub mod tests {
@@ -963,7 +923,7 @@ fn apply_user_defined_derives_for_all_types() {
         [parse_quote!(#[some_attribute])],
     );
 
-    let code = Codegen::new().with::<A>().gen_tests_mod(settings).unwrap();
+    let code = Testgen::new().with::<A>().gen_tests_mod(settings);
 
     let expected_code = quote! {
         pub mod tests {
@@ -1018,7 +978,7 @@ fn apply_user_defined_derives_for_specific_types() {
         ],
         [],
     );
-    let code = Codegen::new().with::<A>().gen_tests_mod(settings).unwrap();
+    let code = Testgen::new().with::<A>().gen_tests_mod(settings);
 
     let expected_code = quote! {
         pub mod tests {
@@ -1073,7 +1033,7 @@ fn opt_out_from_default_derives() {
         derives,
         ..subxt_settings()
     };
-    let code = Codegen::new().with::<A>().gen_tests_mod(settings).unwrap();
+    let code = Testgen::new().with::<A>().gen_tests_mod(settings);
 
     let expected_code = quote! {
         pub mod tests {
@@ -1111,7 +1071,7 @@ fn opt_out_from_default_substitutes() {
         substitutes,
         ..subxt_settings()
     };
-    let code = Codegen::new().with::<S>().gen_tests_mod(settings).unwrap();
+    let code = Testgen::new().with::<S>().gen_tests_mod(settings);
 
     let expected_code = quote! {
         pub mod tests {

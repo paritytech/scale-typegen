@@ -1,4 +1,4 @@
-use crate::Derives;
+use crate::{Derives, TypegenError};
 
 use self::{
     ir::module_ir::ModuleIR,
@@ -8,14 +8,13 @@ use self::{
     type_path::TypeParameter,
     type_path_resolver::TypePathResolver,
 };
-use anyhow::anyhow;
+
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use scale_info::{form::PortableForm, PortableRegistry, PortableType, Type, TypeDef};
 use syn::parse_quote;
 
-pub type TypeGenerationError = anyhow::Error;
-
+pub mod error;
 pub mod ir;
 pub mod settings;
 pub mod type_params;
@@ -34,7 +33,7 @@ impl<'a> TypeGenerator<'a> {
     pub fn new(
         type_registry: &'a PortableRegistry,
         settings: TypeGeneratorSettings,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, TypegenError> {
         let root_mod_ident: Ident = syn::parse_str(&settings.type_mod_name)?;
         Ok(Self {
             type_registry,
@@ -48,7 +47,7 @@ impl<'a> TypeGenerator<'a> {
     }
 
     /// Generate a module containing all types defined in the supplied type registry.
-    pub fn generate_types_mod(&self) -> anyhow::Result<ModuleIR> {
+    pub fn generate_types_mod(&self) -> Result<ModuleIR, TypegenError> {
         let mut root_mod = ModuleIR::new(self.root_mod_ident.clone(), self.root_mod_ident.clone());
 
         for ty in &self.type_registry.types {
@@ -76,7 +75,7 @@ impl<'a> TypeGenerator<'a> {
         Ok(root_mod)
     }
 
-    fn create_type_ir(&self, ty: &PortableType) -> anyhow::Result<Option<TypeIR>> {
+    fn create_type_ir(&self, ty: &PortableType) -> Result<Option<TypeIR>, TypegenError> {
         let PortableType { ty, id: _ } = &ty;
 
         // if the type is some builtin, early return, we are only interested in generating structs and enums.
@@ -90,7 +89,9 @@ impl<'a> TypeGenerator<'a> {
             .path
             .ident()
             .map(|e| syn::parse_str::<Ident>(&e))
-            .ok_or_else(|| anyhow!("Structs and enums should have names"))??;
+            .expect(
+            "Structs and enums should have a name. Checked with namespace.is_empty() above. qed;",
+        )?;
 
         let docs = self.docs_from_scale_info(&ty.docs);
 
@@ -115,7 +116,7 @@ impl<'a> TypeGenerator<'a> {
                         let docs = self.docs_from_scale_info(&v.docs);
                         Ok((v.index, CompositeIR { kind, name, docs }))
                     })
-                    .collect::<anyhow::Result<Vec<(u8, CompositeIR)>>>()?;
+                    .collect::<Result<Vec<(u8, CompositeIR)>, TypegenError>>()?;
                 TypeIRKind::Enum(EnumIR {
                     name,
                     variants,
@@ -151,7 +152,7 @@ impl<'a> TypeGenerator<'a> {
         &self,
         fields: &[scale_info::Field<PortableForm>],
         type_params: &mut TypeParameters,
-    ) -> anyhow::Result<CompositeIRKind> {
+    ) -> Result<CompositeIRKind, TypegenError> {
         let type_path_resolver = self.type_path_resolver();
 
         if fields.is_empty() {
@@ -162,7 +163,7 @@ impl<'a> TypeGenerator<'a> {
         let all_fields_unnamed = fields.iter().all(|f| f.name.is_none());
 
         if !(all_fields_named || all_fields_unnamed) {
-            return Err(anyhow!("Mix of named and unnamed fields encountered"));
+            return Err(TypegenError::InvalidFields(format!("{:?}", fields)));
         }
 
         if all_fields_named {
@@ -190,7 +191,7 @@ impl<'a> TypeGenerator<'a> {
 
                     Ok((ident, CompositeFieldIR::new(path, is_compact, is_boxed)))
                 })
-                .collect::<anyhow::Result<Vec<(Ident, CompositeFieldIR)>>>()?;
+                .collect::<Result<Vec<(Ident, CompositeFieldIR)>, TypegenError>>()?;
             Ok(CompositeIRKind::Named(named_fields))
         } else if all_fields_unnamed {
             let unnamed_fields = fields
@@ -215,7 +216,7 @@ impl<'a> TypeGenerator<'a> {
 
                     Ok(CompositeFieldIR::new(path, is_compact, is_boxed))
                 })
-                .collect::<anyhow::Result<Vec<CompositeFieldIR>>>()?;
+                .collect::<Result<Vec<CompositeFieldIR>, TypegenError>>()?;
             Ok(CompositeIRKind::Unnamed(unnamed_fields))
         } else {
             unreachable!("Is either all unnamed or all named. qed.")
@@ -250,7 +251,7 @@ impl<'a> TypeGenerator<'a> {
         self.settings.derives.default_derives()
     }
 
-    pub fn type_derives(&self, ty: &Type<PortableForm>) -> anyhow::Result<Derives> {
+    pub fn type_derives(&self, ty: &Type<PortableForm>) -> Result<Derives, TypegenError> {
         let joined_path = ty.path.segments.join("::");
         let ty_path: syn::TypePath = syn::parse_str(&joined_path)?;
         let derives = self.settings.derives.resolve(&ty_path);

@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -12,13 +11,13 @@ use crate::{
     TypeGeneratorSettings, TypeSubstitutes,
 };
 
-pub(super) struct Codegen {
+pub(super) struct Testgen {
     registry: scale_info::Registry,
 }
 
-impl Codegen {
+impl Testgen {
     pub fn new() -> Self {
-        Codegen {
+        Testgen {
             registry: scale_info::Registry::new(),
         }
     }
@@ -29,20 +28,19 @@ impl Codegen {
         self
     }
 
-    pub fn gen(self, settings: TypeGeneratorSettings) -> anyhow::Result<TokenStream> {
+    pub fn gen(self, settings: TypeGeneratorSettings) -> TokenStream {
         let registry: PortableRegistry = self.registry.into();
-        let type_gen = TypeGenerator::new(&registry, settings)?;
-        let module = type_gen.generate_types_mod()?;
-        Ok(module.to_token_stream())
+        let type_gen = TypeGenerator::new(&registry, settings).unwrap();
+        let module = type_gen.generate_types_mod().unwrap();
+        module.to_token_stream()
     }
 
-    pub fn gen_tests_mod(self, settings: TypeGeneratorSettings) -> anyhow::Result<TokenStream> {
+    pub fn gen_tests_mod(self, settings: TypeGeneratorSettings) -> TokenStream {
         let registry: PortableRegistry = self.registry.into();
-        let type_gen = TypeGenerator::new(&registry, settings)?;
-        let module = type_gen.generate_types_mod()?;
-        let module = get_mod(&module, TESTS_MOD_PATH)
-            .ok_or_else(|| anyhow!("module does not contain submodule {TESTS_MOD_PATH:?}"))?;
-        Ok(module.to_token_stream())
+        let type_gen = TypeGenerator::new(&registry, settings).unwrap();
+        let module = type_gen.generate_types_mod().unwrap();
+        let module = get_mod(&module, TESTS_MOD_PATH).unwrap();
+        module.to_token_stream()
     }
 }
 
