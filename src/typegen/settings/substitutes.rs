@@ -2,7 +2,16 @@ use proc_macro2::Span;
 use std::{borrow::Borrow, collections::HashMap};
 use syn::spanned::Spanned as _;
 
-use crate::typegen::type_path::{TypePath, TypePathType};
+use crate::typegen::{
+    error::{TypeSubstitutionError, TypeSubstitutionErrorKind},
+    type_path::{TypePath, TypePathType},
+};
+
+use TypeSubstitutionErrorKind::*;
+
+fn error(span: Span, kind: TypeSubstitutionErrorKind) -> TypeSubstitutionError {
+    TypeSubstitutionError { span, kind }
+}
 
 /// A map of type substitutes. We match on the paths to generated types in order
 /// to figure out when to swap said type with some provided substitute.
@@ -15,30 +24,6 @@ pub struct TypeSubstitutes {
 pub struct Substitute {
     path: syn::Path,
     param_mapping: TypeParamMapping,
-}
-
-/// Error attempting to do type substitution.
-#[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-pub enum TypeSubstitutionError {
-    /// Substitute "to" type must be an absolute path.
-    #[error("`substitute_type(with = <path>)` must be a path prefixed with 'crate::' or '::'")]
-    ExpectedAbsolutePath(Span),
-    /// Substitute types must have a valid path.
-    #[error("Substitute types must have a valid path.")]
-    EmptySubstitutePath(Span),
-    /// From/To substitution types should use angle bracket generics.
-    #[error("Expected the from/to type generics to have the form 'Foo<A,B,C..>'.")]
-    ExpectedAngleBracketGenerics(Span),
-    /// Source substitute type must be an ident.
-    #[error("Expected an ident like 'Foo' or 'A' to mark a type to be substituted.")]
-    InvalidFromType(Span),
-    /// Target type is invalid.
-    #[error("Expected an ident like 'Foo' or an absolute concrete path like '::path::to::Bar' for the substitute type.")]
-    InvalidToType(Span),
-    /// Target ident doesn't correspond to any source type.
-    #[error("Cannot find matching param on 'from' type.")]
-    NoMatchingFromType(Span),
 }
 
 #[derive(Debug)]
@@ -128,16 +113,14 @@ impl TypeSubstitutes {
             ..
         }) = src_path.segments.last()
         else {
-            return Err(TypeSubstitutionError::EmptySubstitutePath(src_path.span()));
+            return Err(error(src_path.span(), EmptySubstitutePath));
         };
         let Some(syn::PathSegment {
             arguments: target_path_args,
             ..
         }) = target_path.segments.last()
         else {
-            return Err(TypeSubstitutionError::EmptySubstitutePath(
-                target_path.span(),
-            ));
+            return Err(error(target_path.span(), EmptySubstitutePath));
         };
 
         // Get hold of the generic args for the "from" type, erroring if they aren't valid.
@@ -152,15 +135,13 @@ impl TypeSubstitutes {
                     .iter()
                     .map(|arg| match get_valid_from_substitution_type(arg) {
                         Some(ident) => Ok(ident),
-                        None => Err(TypeSubstitutionError::InvalidFromType(arg.span())),
+                        None => Err(error(arg.span(), InvalidFromType)),
                     })
                     .collect::<Result<Vec<_>, _>>()?
             }
             syn::PathArguments::Parenthesized(args) => {
                 // Generics like (A,B) -> defined; not allowed:
-                return Err(TypeSubstitutionError::ExpectedAngleBracketGenerics(
-                    args.span(),
-                ));
+                return Err(error(args.span(), ExpectedAngleBracketGenerics));
             }
         };
 
@@ -176,15 +157,13 @@ impl TypeSubstitutes {
                     .iter()
                     .map(|arg| match get_valid_to_substitution_type(arg) {
                         Some(arg) => Ok(arg),
-                        None => Err(TypeSubstitutionError::InvalidToType(arg.span())),
+                        None => Err(error(arg.span(), InvalidToType)),
                     })
                     .collect::<Result<Vec<_>, _>>()?
             }
             syn::PathArguments::Parenthesized(args) => {
                 // Generics like (A,B) -> defined; not allowed:
-                return Err(TypeSubstitutionError::ExpectedAngleBracketGenerics(
-                    args.span(),
-                ));
+                return Err(error(args.span(), ExpectedAngleBracketGenerics));
             }
         };
 
@@ -403,7 +382,7 @@ impl TryFrom<syn::Path> for AbsolutePath {
         if is_absolute(&value) {
             Ok(AbsolutePath(value))
         } else {
-            Err(TypeSubstitutionError::ExpectedAbsolutePath(value.span()))
+            Err(error(value.span(), ExpectedAbsolutePath))
         }
     }
 }
