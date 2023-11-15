@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod typegen;
+pub mod utils;
 
 pub use typegen::{
     error::TypegenError,
