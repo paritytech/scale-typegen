@@ -1,6 +1,7 @@
-use anyhow::anyhow;
 use scale_info::{form::PortableForm, PortableRegistry, Type, TypeDef};
 use syn::Ident;
+
+use crate::TypegenError;
 
 use super::{
     settings::substitutes::TypeSubstitutes,
@@ -53,7 +54,7 @@ impl<'a> TypePathResolver<'a> {
         id: u32,
         parent_type_params: &[TypeParameter],
         original_name: Option<&str>,
-    ) -> anyhow::Result<TypePath> {
+    ) -> Result<TypePath, TypegenError> {
         self.resolve_type_path_recurse(id, true, parent_type_params, original_name)
     }
 
@@ -62,7 +63,7 @@ impl<'a> TypePathResolver<'a> {
     /// # Panics
     ///
     /// If no type with the given id found in the type registry.
-    pub fn resolve_type_path(&self, id: u32) -> anyhow::Result<TypePath> {
+    pub fn resolve_type_path(&self, id: u32) -> Result<TypePath, TypegenError> {
         self.resolve_type_path_recurse(id, false, &[], None)
     }
 
@@ -77,7 +78,7 @@ impl<'a> TypePathResolver<'a> {
         is_field: bool,
         parent_type_params: &[TypeParameter],
         original_name: Option<&str>,
-    ) -> anyhow::Result<TypePath> {
+    ) -> Result<TypePath, TypegenError> {
         if let Some(parent_type_param) = parent_type_params.iter().find(|tp| {
             tp.concrete_type_id == id
                 && original_name.map_or(true, |original_name| tp.original_name == original_name)
@@ -91,7 +92,11 @@ impl<'a> TypePathResolver<'a> {
         if ty.path.ident() == Some("Cow".to_string()) {
             let inner_ty_id = ty.type_params[0]
                 .ty
-                .ok_or_else(|| anyhow!("type parameters to Cow are not expected to be skipped"))?
+                .ok_or_else(|| {
+                    TypegenError::InvalidType(
+                        "type parameters to Cow are not expected to be skipped".into(),
+                    )
+                })?
                 .id;
             ty = self.resolve_type(inner_ty_id)?
         }
@@ -102,7 +107,7 @@ impl<'a> TypePathResolver<'a> {
             .filter_map(|f| {
                 f.ty.map(|f| self.resolve_type_path_recurse(f.id, false, parent_type_params, None))
             })
-            .collect::<anyhow::Result<Vec<TypePath>>>()?;
+            .collect::<Result<Vec<TypePath>, TypegenError>>()?;
 
         let ty = match &ty.type_def {
             TypeDef::Composite(_) | TypeDef::Variant(_) => {
@@ -139,7 +144,7 @@ impl<'a> TypePathResolver<'a> {
                     .fields
                     .iter()
                     .map(|f| self.resolve_type_path_recurse(f.id, false, parent_type_params, None))
-                    .collect::<anyhow::Result<Vec<TypePath>>>()?;
+                    .collect::<Result<Vec<TypePath>, TypegenError>>()?;
 
                 TypePathType::Tuple { elements }
             }
@@ -153,11 +158,7 @@ impl<'a> TypePathResolver<'a> {
 
                 let compact_type_path = self
                     .compact_type_path
-                    .ok_or_else(|| {
-                        anyhow!(
-                            "compact_type_path is None, cannot generate code for compact types."
-                        )
-                    })?
+                    .ok_or(TypegenError::CompactPathNone)?
                     .clone();
 
                 TypePathType::Compact {
@@ -167,8 +168,9 @@ impl<'a> TypePathResolver<'a> {
                 }
             }
             TypeDef::BitSequence(bitseq) => {
-                let decoded_bits_type_path = self.decoded_bits_type_path
-                    .ok_or_else(|| anyhow!("decoded_bits_type_path is None, cannot generate code with bit sequences."))?
+                let decoded_bits_type_path = self
+                    .decoded_bits_type_path
+                    .ok_or(TypegenError::DecodedBitsPathNone)?
                     .clone();
 
                 let bit_order_type = self.resolve_type_path_recurse(
@@ -198,20 +200,20 @@ impl<'a> TypePathResolver<'a> {
     pub fn type_path_maybe_with_substitutes(
         &self,
         path: &scale_info::Path<PortableForm>,
-        params: &Vec<TypePath>,
+        params: &[TypePath],
     ) -> TypePathType {
         if let Some(substitute) = self.substitutes.for_path_with_params(path, params) {
             substitute
         } else {
-            TypePathType::from_type_def_path(path, self.root_mod_ident.clone(), params.clone())
+            TypePathType::from_type_def_path(path, self.root_mod_ident.clone(), params.to_vec())
         }
     }
 
-    pub fn resolve_type(&self, id: u32) -> anyhow::Result<Type<PortableForm>> {
+    pub fn resolve_type(&self, id: u32) -> Result<Type<PortableForm>, TypegenError> {
         let ty = self
             .registry
             .resolve(id)
-            .ok_or_else(|| anyhow!("No type with id {id} found"))?;
+            .ok_or(TypegenError::TypeNotFound(id))?;
         Ok(ty.clone())
     }
 }

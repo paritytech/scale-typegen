@@ -15,13 +15,14 @@
 pub mod typegen;
 
 pub use typegen::{
+    error::TypegenError,
     settings::{
         derives::{Derives, DerivesRegistry},
         substitutes::TypeSubstitutes,
         TypeGeneratorSettings,
     },
     type_path_resolver::TypePathResolver,
-    TypeGenerationError, TypeGenerator,
+    TypeGenerator,
 };
 
 #[cfg(test)]

@@ -9,12 +9,10 @@ repository = "https://github.com/paritytech/scale-typegen"
 description = "Type Generation for SCALE encoded Rust Types"
 
 [dependencies]
-anyhow = "1.0.75"
 parity-scale-codec = { version = "3.6.5", features = ["derive"] }
 proc-macro2 = "1.0.69"
 quote = "1.0.33"
 scale-bits = "0.4.0"
-
 scale-info = { version = "2.10.0", features = [
     "derive",
     "bitvec",
