@@ -385,7 +385,6 @@ dependencies = [
  "scale-info",
  "serde",
  "serde_json",
- "smallvec",
  "syn 2.0.38",
  "thiserror",
 ]

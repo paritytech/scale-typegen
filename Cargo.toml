@@ -20,7 +20,6 @@ scale-info = { version = "2.10.0", features = [
     "docs",
     "serde",
 ] }
-smallvec = "1.11.2"
 syn = { version = "2.0.38", features = ["full", "extra-traits"] }
 thiserror = "1.0.50"
 
