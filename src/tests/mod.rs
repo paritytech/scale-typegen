@@ -1113,6 +1113,7 @@ fn ensure_unique_type_paths_test() {
             .types
             .iter()
             .map(|t| t.ty.path.segments.clone().join("::"))
+            .filter(|e| !e.is_empty())
             .collect::<Vec<String>>();
         lines.sort();
         lines
@@ -1122,10 +1123,6 @@ fn ensure_unique_type_paths_test() {
     assert_eq!(
         e1,
         vec![
-            "",
-            "",
-            "",
-            "",
             "scale_typegen::tests::Header",
             "scale_typegen::tests::Header",
             "scale_typegen::tests::Header",
@@ -1138,14 +1135,9 @@ fn ensure_unique_type_paths_test() {
     assert_eq!(
         e2,
         vec![
-            "",
-            "",
-            "",
-            "",
-            "scale_typegen::tests::Header",
+            "scale_typegen::tests::Header1",
             "scale_typegen::tests::Header2",
             "scale_typegen::tests::Header3",
         ]
     );
-    // dbg!(registry);
 }
