@@ -18,6 +18,9 @@ smallvec = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
 
+scale-description = { workspace = true }
+scale-example = { workspace = true }
+
 [dev-dependencies]
 prettyplease = { workspace = true }
 scale-decode = { workspace = true }

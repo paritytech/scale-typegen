@@ -335,7 +335,7 @@ dependencies = [
 
 [[package]]
 name = "scale-description"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "indoc",
@@ -376,7 +376,7 @@ dependencies = [
 
 [[package]]
 name = "scale-example"
-version = "0.1.0"
+version = "0.0.1"
 
 [[package]]
 name = "scale-info"
@@ -416,7 +416,9 @@ dependencies = [
  "quote",
  "scale-bits",
  "scale-decode",
+ "scale-description",
  "scale-encode",
+ "scale-example",
  "scale-info",
  "serde",
  "serde_json",
