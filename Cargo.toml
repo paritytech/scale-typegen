@@ -1,14 +1,19 @@
-[package]
-name = "scale-typegen"
-version = "0.0.1"
-edition = "2021"
-authors = ["Parity Technologies <admin@parity.io>"]
-license = "Apache-2.0"
-readme = "README.md"
-repository = "https://github.com/paritytech/scale-typegen"
-description = "Type Generation for SCALE encoded Rust Types"
+[workspace]
+members = ["scale-typegen", "scale-description", "scale-example"]
+resolver = "2"
 
-[dependencies]
+
+[workspace.package]
+authors = ["Parity Technologies <admin@parity.io>"]
+edition = "2021"
+version = "0.0.1"
+rust-version = "1.70.0"
+license = "Apache-2.0 OR GPL-3.0"
+repository = "https://github.com/paritytech/scale-typegen"
+homepage = "https://www.parity.io/"
+
+
+[workspace.dependencies]
 parity-scale-codec = { version = "3.6.5", features = ["derive"] }
 proc-macro2 = "1.0.69"
 quote = "1.0.33"
@@ -23,8 +28,6 @@ scale-info = { version = "2.10.0", features = [
 smallvec = "1.11.2"
 syn = { version = "2.0.38", features = ["full", "extra-traits"] }
 thiserror = "1.0.50"
-
-[dev-dependencies]
 prettyplease = "0.2.15"
 scale-decode = "0.9.0"
 scale-encode = "0.5.0"
@@ -32,3 +35,4 @@ serde = "1.0.192"
 serde_json = "1.0.108"
 bitvec = { version = "1", default-features = false }
 pretty_assertions = "1.4.0"
+anyhow = "1.0.75"
