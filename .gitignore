@@ -1,2 +1,9 @@
-/target
+**/target/
+**/*.rs.bk
+
+.DS_Store
+
+.vscode
+.idea
+
 Cargo.lock
