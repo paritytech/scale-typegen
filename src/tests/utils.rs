@@ -28,6 +28,10 @@ impl Testgen {
         self
     }
 
+    pub fn into_portable_registry(self) -> PortableRegistry {
+        self.registry.into()
+    }
+
     pub fn gen(self, settings: TypeGeneratorSettings) -> TokenStream {
         let registry: PortableRegistry = self.registry.into();
         let type_gen = TypeGenerator::new(&registry, settings).unwrap();

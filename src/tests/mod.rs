@@ -8,6 +8,7 @@ use syn::parse_quote;
 use crate::{
     tests::utils::{subxt_settings, Testgen},
     typegen::settings::TypeGeneratorSettings,
+    utils::ensure_unique_type_paths,
     DerivesRegistry, TypeSubstitutes,
 };
 
@@ -1087,4 +1088,56 @@ fn opt_out_from_default_substitutes() {
     };
 
     assert_eq!(code.to_string(), expected_code.to_string());
+}
+
+#[test]
+fn ensure_unique_type_paths_test() {
+    use scale_info::PortableRegistry;
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    #[scale_info(skip_type_params(Hash))]
+    struct Header<Hash, AccountId> {
+        id: AccountId,
+        hash: Hash,
+    }
+
+    let mut registry = Testgen::new()
+        .with::<Header<String, u32>>()
+        .with::<Header<u8, u32>>()
+        .with::<Header<u16, u32>>()
+        .into_portable_registry();
+
+    let sorted_type_paths = |registry: &PortableRegistry| -> Vec<String> {
+        let mut lines = registry
+            .types
+            .iter()
+            .map(|t| t.ty.path.segments.clone().join("::"))
+            .filter(|e| !e.is_empty())
+            .collect::<Vec<String>>();
+        lines.sort();
+        lines
+    };
+
+    let e1 = sorted_type_paths(&registry);
+    assert_eq!(
+        e1,
+        vec![
+            "scale_typegen::tests::Header",
+            "scale_typegen::tests::Header",
+            "scale_typegen::tests::Header",
+        ]
+    );
+
+    ensure_unique_type_paths(&mut registry);
+
+    let e2 = sorted_type_paths(&registry);
+    assert_eq!(
+        e2,
+        vec![
+            "scale_typegen::tests::Header1",
+            "scale_typegen::tests::Header2",
+            "scale_typegen::tests::Header3",
+        ]
+    );
 }
