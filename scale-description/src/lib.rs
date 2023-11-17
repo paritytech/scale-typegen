@@ -1,5 +1,6 @@
 mod description;
 mod formatting;
+mod transformer;
 
 #[cfg(feature = "type-example")]
 pub mod type_example;
