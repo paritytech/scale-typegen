@@ -41,7 +41,7 @@ use scale_info::{
 
 //         let ident = ty.path.ident();
 //         let prefix = type_def_prefix(&ty.type_def);
-//         let mut type_def_description = type_def_type_description(&ty.type_def, registry, cache)?;
+//         let mut type_def_description = type_def_type_description(&ty.type_def, transformer)?;
 //         if let Some(ident) = ident {
 //             type_def_description = format!("{}{}{}", prefix, ident, type_def_description);
 //             cache.insert(
@@ -60,62 +60,37 @@ use scale_info::{
 //     }
 // }
 
+use crate::transformer::Transformer;
+
 use super::formatting::format_type_description;
 
 pub fn type_description(type_id: u32, type_registry: &PortableRegistry) -> anyhow::Result<String> {
-    let mut cache = HashMap::<u32, CachedDescription>::new();
-    let type_description = type_description_recurse(type_id, type_registry, &mut cache)?;
-    let type_description = format_type_description(&type_description);
-    Ok(type_description)
-}
-
-#[derive(Clone, Debug)]
-enum CachedDescription {
-    /// not known yet, but computation has already started
-    Recursive,
-    /// computation was finished
-    Description(String),
-}
-
-fn type_description_recurse(
-    type_id: u32,
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
-) -> anyhow::Result<String> {
-    let ty = registry.resolve(type_id).ok_or(anyhow::anyhow!(
-        "Type with id {} not found in registry",
-        type_id
-    ))?;
-    match cache.get(&type_id) {
-        Some(CachedDescription::Recursive) => {
-            let type_name = ty
-                .path
-                .ident()
-                .ok_or_else(|| anyhow!("Recursive type without type name encountered: {:?}", ty))?;
-            return Ok(type_name);
-        }
-        Some(CachedDescription::Description(description)) => return Ok(description.clone()),
-        _ => {}
-    };
-    cache.insert(type_id, CachedDescription::Recursive);
-
-    let ident = ty.path.ident();
-    let prefix = type_def_prefix(&ty.type_def);
-    let mut type_def_description = type_def_type_description(&ty.type_def, registry, cache)?;
-    if let Some(ident) = ident {
-        type_def_description = format!("{}{}{}", prefix, ident, type_def_description);
-        cache.insert(
-            type_id,
-            CachedDescription::Description(format!("{prefix}{ident}")),
-        );
-    } else {
-        cache.insert(
-            type_id,
-            CachedDescription::Description(type_def_description.clone()),
-        );
-        type_def_description = format!("{}{}", prefix, type_def_description);
+    fn return_type_name_on_recurse(ty: &Type<PortableForm>) -> anyhow::Result<String> {
+        let type_name = ty
+            .path
+            .ident()
+            .ok_or_else(|| anyhow!("Recursive type without type name encountered: {:?}", ty))?;
+        Ok(type_name)
     }
 
+    let transformer = Transformer::new(
+        type_description_policy,
+        return_type_name_on_recurse,
+        (),
+        type_registry,
+    );
+    let description = transformer.resolve(type_id)?;
+    let formatted = format_type_description(&description);
+    Ok(formatted)
+}
+
+fn type_description_policy(
+    ty: &Type<PortableForm>,
+    transformer: &Transformer<String>,
+) -> anyhow::Result<String> {
+    let ident = ty.path.ident();
+    let prefix = type_def_prefix(&ty.type_def);
+    let mut type_def_description = type_def_type_description(&ty.type_def, transformer)?;
     Ok(type_def_description)
 }
 
@@ -129,35 +104,31 @@ fn type_def_prefix(type_def: &TypeDef<PortableForm>) -> &str {
 
 fn type_def_type_description(
     type_def: &TypeDef<PortableForm>,
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
+    transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
     match type_def {
-        TypeDef::Composite(composite) => {
-            fields_type_description(&composite.fields, registry, cache)
-        }
+        TypeDef::Composite(composite) => fields_type_description(&composite.fields, transformer),
 
-        TypeDef::Variant(variant) => variant_type_def_type_description(variant, registry, cache),
-        TypeDef::Sequence(sequence) => sequence_type_description(sequence, registry, cache),
-        TypeDef::Array(array) => array_type_description(array, registry, cache),
-        TypeDef::Tuple(tuple) => tuple_type_description(tuple, registry, cache),
+        TypeDef::Variant(variant) => variant_type_def_type_description(variant, transformer),
+        TypeDef::Sequence(sequence) => sequence_type_description(sequence, transformer),
+        TypeDef::Array(array) => array_type_description(array, transformer),
+        TypeDef::Tuple(tuple) => tuple_type_description(tuple, transformer),
         TypeDef::Primitive(primitive) => primitive_type_description(primitive),
-        TypeDef::Compact(compact) => compact_type_description(compact, registry, cache),
+        TypeDef::Compact(compact) => compact_type_description(compact, transformer),
         TypeDef::BitSequence(bit_sequence) => {
-            bit_sequence_type_description(bit_sequence, registry, cache)
+            bit_sequence_type_description(bit_sequence, transformer)
         }
     }
 }
 
 fn tuple_type_description(
     tuple: &TypeDefTuple<PortableForm>,
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
+    transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
     let mut output = "(".to_string();
     let mut iter = tuple.fields.iter().peekable();
     while let Some(ty) = iter.next() {
-        let type_description = type_description_recurse(ty.id, registry, cache)?;
+        let type_description = transformer.resolve(ty.id)?;
         output.push_str(&type_description);
         if iter.peek().is_some() {
             output.push(',')
@@ -169,38 +140,35 @@ fn tuple_type_description(
 
 fn bit_sequence_type_description(
     bit_sequence: &TypeDefBitSequence<PortableForm>,
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
+    transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
-    let bit_order_type = type_description_recurse(bit_sequence.bit_order_type.id, registry, cache)?;
-    let bit_store_type = type_description_recurse(bit_sequence.bit_store_type.id, registry, cache)?;
+    let bit_order_type = transformer.resolve(bit_sequence.bit_order_type.id)?;
+    let bit_store_type = transformer.resolve(bit_sequence.bit_store_type.id)?;
     Ok(format!("BitSequence({bit_order_type}, {bit_store_type})"))
 }
 
 fn sequence_type_description(
     sequence: &TypeDefSequence<PortableForm>,
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
+    transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
-    let type_description = type_description_recurse(sequence.type_param.id, registry, cache)?;
+    let type_description = transformer.resolve(sequence.type_param.id)?;
+
     Ok(format!("Vec<{type_description}>"))
 }
 
 fn compact_type_description(
     compact: &TypeDefCompact<PortableForm>,
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
+    transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
-    let type_description = type_description_recurse(compact.type_param.id, registry, cache)?;
+    let type_description = transformer.resolve(compact.type_param.id)?;
     Ok(format!("Compact<{type_description}>"))
 }
 
 fn array_type_description(
     array: &TypeDefArray<PortableForm>,
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
+    transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
-    let type_description = type_description_recurse(array.type_param.id, registry, cache)?;
+    let type_description = transformer.resolve(array.type_param.id)?;
     Ok(format!("[{type_description}; {}]", array.len))
 }
 
@@ -227,14 +195,13 @@ fn primitive_type_description(primitive: &TypeDefPrimitive) -> anyhow::Result<St
 
 fn variant_type_def_type_description(
     variant_type_def: &TypeDefVariant<PortableForm>,
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
+    transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
     let mut variants_string = String::new();
     variants_string.push('{');
     let mut iter = variant_type_def.variants.iter().peekable();
     while let Some(variant) = iter.next() {
-        let variant_string = variant_type_description(variant, registry, cache)?;
+        let variant_string = variant_type_description(variant, transformer)?;
         variants_string.push_str(&variant_string);
 
         if iter.peek().is_some() {
@@ -247,10 +214,9 @@ fn variant_type_def_type_description(
 
 fn variant_type_description(
     variant: &Variant<PortableForm>,
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
+    transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
-    let fields_string = fields_type_description(&variant.fields, registry, cache)?;
+    let fields_string = fields_type_description(&variant.fields, transformer)?;
     let output = if fields_string == "()" {
         variant.name.to_string()
     } else if fields_string.starts_with('(') {
@@ -263,8 +229,7 @@ fn variant_type_description(
 
 fn fields_type_description(
     fields: &[Field<PortableForm>],
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
+    transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
     if fields.is_empty() {
         return Ok("()".to_string());
@@ -286,7 +251,7 @@ fn fields_type_description(
     fields_string.push(brackets.0);
     let mut iter = fields.iter().peekable();
     while let Some(field) = iter.next() {
-        let field_description = field_type_description(field, registry, cache)?;
+        let field_description = field_type_description(field, transformer)?;
         fields_string.push_str(&field_description);
 
         if iter.peek().is_some() {
@@ -299,10 +264,9 @@ fn fields_type_description(
 
 fn field_type_description(
     field: &Field<PortableForm>,
-    registry: &PortableRegistry,
-    cache: &mut HashMap<u32, CachedDescription>,
+    transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
-    let mut type_description = type_description_recurse(field.ty.id, registry, cache)?;
+    let mut type_description = transformer.resolve(field.ty.id)?;
 
     let is_boxed = field
         .type_name

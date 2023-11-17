@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
 use scale_info::{form::PortableForm, PortableRegistry, Type};
 
@@ -10,35 +10,46 @@ enum Cached<Out> {
     Computed(Out),
 }
 
-struct Transformer<R> {
+pub struct Transformer<'a, R, S = ()> {
     /// keep this private such that the cache is sealed and connot be accessed from outside of the Transformer::transform function
-    __cache: HashMap<u32, Cached<R>>,
-    policy: fn(&Type<PortableForm>, &PortableRegistry, &mut Self) -> anyhow::Result<R>,
+    cache: RefCell<HashMap<u32, Cached<R>>>,
+    /// state can be used for example for an Rng
+    state: S,
+    policy: fn(&Type<PortableForm>, &Self) -> anyhow::Result<R>,
     resurse_policy: fn(&Type<PortableForm>) -> anyhow::Result<R>,
+    registry: &'a PortableRegistry,
 }
 
-impl<R> Transformer<R>
+impl<'a, R, S> Transformer<'a, R, S>
 where
     R: Clone,
 {
-    fn new(
-        policy: fn(&Type<PortableForm>, &PortableRegistry, &mut Self) -> anyhow::Result<R>,
+    pub fn state(&self) -> &S {
+        &self.state
+    }
+
+    pub fn new(
+        policy: fn(&Type<PortableForm>, &Self) -> anyhow::Result<R>,
         resurse_policy: fn(&Type<PortableForm>) -> anyhow::Result<R>,
+        state: S,
+        registry: &'a PortableRegistry,
     ) -> Self {
         Transformer {
-            __cache: HashMap::new(),
+            cache: RefCell::new(HashMap::new()),
+            state,
             policy,
             resurse_policy,
+            registry,
         }
     }
 
-    fn transform<P, RP>(&mut self, type_id: u32, registry: &PortableRegistry) -> anyhow::Result<R> {
-        let ty = registry.resolve(type_id).ok_or(anyhow::anyhow!(
+    pub fn resolve(&self, type_id: u32) -> anyhow::Result<R> {
+        let ty = self.registry.resolve(type_id).ok_or(anyhow::anyhow!(
             "Type with id {} not found in registry",
             type_id
         ))?;
 
-        match self.__cache.get(&type_id) {
+        match self.cache.borrow().get(&type_id) {
             Some(Cached::Recursive) => {
                 return (self.resurse_policy)(ty);
             }
@@ -46,9 +57,11 @@ where
             _ => {}
         };
 
-        self.__cache.insert(type_id, Cached::Recursive);
-
-        let r = (self.policy)(ty, registry, self);
-        r
+        self.cache.borrow_mut().insert(type_id, Cached::Recursive);
+        let r = (self.policy)(ty, self)?;
+        self.cache
+            .borrow_mut()
+            .insert(type_id, Cached::Computed(r.clone()));
+        Ok(r)
     }
 }
