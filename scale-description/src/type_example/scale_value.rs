@@ -3,12 +3,12 @@ use rand::seq::SliceRandom;
 use scale_info::{form::PortableForm, PortableRegistry, TypeDef, TypeDefPrimitive};
 use scale_value::{BitSequence, Composite, Primitive, Value, ValueDef, Variant};
 
-pub fn example_scale_value(id: u32, types: &PortableRegistry) -> anyhow::Result<Value> {
+pub fn scale_value_example(id: u32, types: &PortableRegistry) -> anyhow::Result<Value> {
     const MAGIC_SEED: u64 = 42;
-    example_scale_value_from_seed(id, types, MAGIC_SEED)
+    scale_value_example_from_seed(id, types, MAGIC_SEED)
 }
 
-pub fn example_scale_value_from_seed(
+pub fn scale_value_example_from_seed(
     id: u32,
     types: &PortableRegistry,
     seed: u64,

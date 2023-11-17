@@ -517,18 +517,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "scale-example"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "proc-macro2",
- "rand",
- "rand_chacha",
- "scale-info",
- "scale-value",
-]
-
-[[package]]
 name = "scale-info"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -568,7 +556,6 @@ dependencies = [
  "scale-decode 0.9.0",
  "scale-description",
  "scale-encode",
- "scale-example",
  "scale-info",
  "serde",
  "serde_json",

@@ -1,6 +1,9 @@
 mod description;
 mod formatting;
 
+#[cfg(feature = "type-example")]
+pub mod type_example;
+
 pub use description::type_description;
 
 #[cfg(test)]
