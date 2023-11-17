@@ -10,13 +10,18 @@ enum Cached<Out> {
     Computed(Out),
 }
 
+/// The transformer provides an abstraction for traversing a type registry
+/// given a type_id as a starting point, and **transforming** it into a tree-like structure.
+/// It provides a cache that shields users from infinite recursion.
+///
+/// In this way, we can have easy recursion protection mechanisms for type descirptions, rust type examples and scale value type examples.
 pub struct Transformer<'a, R, S = ()> {
     /// keep this private such that the cache is sealed and connot be accessed from outside of the Transformer::transform function
     cache: RefCell<HashMap<u32, Cached<R>>>,
     /// state can be used for example for an Rng
     state: S,
     policy: fn(&Type<PortableForm>, &Self) -> anyhow::Result<R>,
-    resurse_policy: fn(&Type<PortableForm>) -> anyhow::Result<R>,
+    recurse_policy: fn(&Type<PortableForm>) -> anyhow::Result<R>,
     registry: &'a PortableRegistry,
 }
 
@@ -38,7 +43,7 @@ where
             cache: RefCell::new(HashMap::new()),
             state,
             policy,
-            resurse_policy,
+            recurse_policy: resurse_policy,
             registry,
         }
     }
@@ -51,7 +56,7 @@ where
 
         match self.cache.borrow().get(&type_id) {
             Some(Cached::Recursive) => {
-                return (self.resurse_policy)(ty);
+                return (self.recurse_policy)(ty);
             }
             Some(Cached::Computed(r)) => return Ok(r.clone()),
             _ => {}

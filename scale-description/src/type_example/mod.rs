@@ -26,7 +26,7 @@ mod tests {
     /// for certain types we cannot create any valid scale_value type examples because they are infinitely nested. We need to return an error in those cases.
     /// Otherwise we would get a stack overflow and the program crashes...
     #[test]
-    fn recursion_is_limited() {
+    fn recursion_does_not_cause_stack_overflow() {
         #[allow(unused)]
         #[derive(TypeInfo)]
         struct Human {
@@ -34,11 +34,9 @@ mod tests {
             mom: Box<Human>,
             dad: Box<Human>,
         }
-
         let (id, types) = make_type::<Human>();
-        let example = scale_value_example(id, &types).unwrap();
-
-        println!("{example}");
+        // Make sure recursion does not panic. An error should be yielded instead.
+        assert!(scale_value_example(id, &types).is_err());
     }
 
     #[test]
@@ -68,7 +66,7 @@ mod tests {
         let b1 = scale_value_example_from_seed(id, &types, 30).unwrap();
         let b2 = scale_value_example_from_seed(id, &types, 30).unwrap();
 
-        // YOu can check the examples by comparing them side by side:
+        // The examples can be checked manually by comparing them side by side:
         // println!("{b2}\n{a1}");
 
         assert_eq!(a1, a2);

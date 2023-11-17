@@ -6,60 +6,6 @@ use scale_info::{
     TypeDefCompact, TypeDefPrimitive, TypeDefSequence, TypeDefTuple, TypeDefVariant, Variant,
 };
 
-// struct PortableRegistryTypeTransformer<'a, R>
-// where
-//     R: Clone,
-// {
-//     registry: &'a PortableRegistry,
-//     cache: HashMap<u32, Cached<R>>,
-//     transform_type: fn(&'a Type<PortableForm>) -> anyhow::Result<R>,
-//     recurse_policy: fn(&'a Type<PortableForm>) -> anyhow::Result<R>,
-// }
-
-// impl<'a, R, Transform, RecurseTransform>
-//     PortableRegistryTypeTransformer<'a, R, Transform, RecurseTransform>
-// where
-//     Transform: Fn(&'a Type<PortableForm>) -> anyhow::Result<R>,
-//     RecurseTransform: Fn(&'a Type<PortableForm>) -> anyhow::Result<R>,
-//     R: Clone,
-// {
-//     fn transform(&mut self, type_id: u32) -> anyhow::Result<R> {
-//         let ty = self.registry.resolve(type_id).ok_or(anyhow::anyhow!(
-//             "Type with id {} not found in registry",
-//             type_id
-//         ))?;
-//         match self.cache.get(&type_id) {
-//             Some(Cached::Recursive) => {
-//                 return (self.recurse_policy)(ty);
-//             }
-//             Some(Cached::Computed(r)) => return Ok(r.clone()),
-//             _ => {}
-//         };
-//         self.cache.insert(type_id, Cached::Recursive);
-
-//         let r = (self.transform_type)(ty);
-
-//         let ident = ty.path.ident();
-//         let prefix = type_def_prefix(&ty.type_def);
-//         let mut type_def_description = type_def_type_description(&ty.type_def, transformer)?;
-//         if let Some(ident) = ident {
-//             type_def_description = format!("{}{}{}", prefix, ident, type_def_description);
-//             cache.insert(
-//                 type_id,
-//                 CachedDescription::Description(format!("{prefix}{ident}")),
-//             );
-//         } else {
-//             cache.insert(
-//                 type_id,
-//                 CachedDescription::Description(type_def_description.clone()),
-//             );
-//             type_def_description = format!("{}{}", prefix, type_def_description);
-//         }
-
-//         Ok(type_def_description)
-//     }
-// }
-
 use crate::transformer::Transformer;
 
 use super::formatting::format_type_description;
@@ -74,7 +20,7 @@ pub fn type_description(type_id: u32, type_registry: &PortableRegistry) -> anyho
     }
 
     let transformer = Transformer::new(
-        type_description_policy,
+        ty_description,
         return_type_name_on_recurse,
         (),
         type_registry,
@@ -84,14 +30,14 @@ pub fn type_description(type_id: u32, type_registry: &PortableRegistry) -> anyho
     Ok(formatted)
 }
 
-fn type_description_policy(
+fn ty_description(
     ty: &Type<PortableForm>,
     transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
-    let ident = ty.path.ident();
+    let ident = ty.path.ident().unwrap_or_default();
     let prefix = type_def_prefix(&ty.type_def);
-    let mut type_def_description = type_def_type_description(&ty.type_def, transformer)?;
-    Ok(type_def_description)
+    let type_def_description = type_def_type_description(&ty.type_def, transformer)?;
+    Ok(format!("{prefix}{ident}{type_def_description}"))
 }
 
 /// todo: clean this up
