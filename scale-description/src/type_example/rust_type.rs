@@ -2,10 +2,10 @@ use crate::transformer::Transformer;
 use anyhow::anyhow;
 use proc_macro2::{TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
-use rand::{seq::SliceRandom, Rng, SeedableRng};
+use rand::{seq::SliceRandom, SeedableRng};
 use scale_info::{form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeDefPrimitive};
 use scale_typegen::{TypeGenerator, TypeGeneratorSettings};
-use std::{borrow::BorrowMut, cell::RefCell};
+use std::cell::RefCell;
 
 type CodeTransformer<'a> = Transformer<'a, TokenStream, CodeTransformerState<'a>>;
 

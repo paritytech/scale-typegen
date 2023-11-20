@@ -2,14 +2,6 @@ use std::{cell::RefCell, collections::HashMap};
 
 use scale_info::{form::PortableForm, PortableRegistry, Type};
 
-#[derive(Clone, Debug)]
-enum Cached<Out> {
-    /// not known yet, but computation has already started
-    Recursive,
-    /// computation was finished
-    Computed(Out),
-}
-
 /// The transformer provides an abstraction for traversing a type registry
 /// given a type_id as a starting point, and **transforming** it into a tree-like structure.
 /// It provides a cache that shields users from infinite recursion.
@@ -23,6 +15,14 @@ pub struct Transformer<'a, R, S = ()> {
     policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
     recurse_policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
     registry: &'a PortableRegistry,
+}
+
+#[derive(Clone, Debug)]
+enum Cached<Out> {
+    /// not known yet, but computation has already started
+    Recursive,
+    /// computation was finished
+    Computed(Out),
 }
 
 impl<'a, R, S> Transformer<'a, R, S>
