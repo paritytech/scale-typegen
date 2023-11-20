@@ -4,7 +4,7 @@ use proc_macro2::{TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use scale_info::{form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeDefPrimitive};
-use scale_typegen::{typegen::ir::type_ir::TypeIR, TypeGenerator, TypeGeneratorSettings};
+use scale_typegen::{TypeGenerator, TypeGeneratorSettings};
 use std::{borrow::BorrowMut, cell::RefCell};
 
 type CodeTransformer<'a> = Transformer<'a, TokenStream, CodeTransformerState<'a>>;
@@ -117,9 +117,9 @@ pub fn rust_type_example_from_seed(
     ty_path_middleware: Option<TyPathMiddleware>,
 ) -> anyhow::Result<TokenStream> {
     fn error_on_recurse(
-        type_id: u32,
+        _type_id: u32,
         ty: &Type<PortableForm>,
-        transformer: &CodeTransformer,
+        _transformer: &CodeTransformer,
     ) -> anyhow::Result<TokenStream> {
         Err(anyhow!(
             "Cannot generate rust type example for recursive type: {ty:?}"
@@ -179,13 +179,13 @@ fn ty_example(
         scale_info::TypeDef::Sequence(def) => {
             // return a Vec with 2 elements:
             let inner_ty = transformer.resolve_type(def.type_param.id)?;
-            let item_code = ty_example(def.type_param.id, &inner_ty, transformer)?; // todo!("Might need CompactMode::Expl")
+            let item_code = ty_example(def.type_param.id, inner_ty, transformer)?; // todo!("Might need CompactMode::Expl")
             let vec_code = quote!(vec![#item_code, #item_code, #item_code]);
             Ok(vec_code)
         }
         scale_info::TypeDef::Array(def) => {
             let inner_ty = transformer.resolve_type(def.type_param.id)?;
-            let item_code = ty_example(def.type_param.id, &inner_ty, transformer)?; //todo!("Might need CompactMode::Expl")
+            let item_code = ty_example(def.type_param.id, inner_ty, transformer)?; //todo!("Might need CompactMode::Expl")
             let inner_is_copy = transformer.type_def_is_copy(&inner_ty.type_def)?;
             let len = def.len as usize;
             let arr_code = if inner_is_copy {
@@ -314,7 +314,7 @@ fn primitive_example(def: &TypeDefPrimitive, rng: &mut impl rand::Rng) -> TokenS
             quote!(#n)
         }
         TypeDefPrimitive::U16 => {
-            let n = rng.gen::<u16>();
+            let _n = rng.gen::<u16>();
             quote!(n)
         }
         TypeDefPrimitive::U32 => {

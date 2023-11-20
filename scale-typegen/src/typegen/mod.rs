@@ -40,7 +40,7 @@ impl<'a> TypeGenerator<'a> {
     }
 
     pub fn settings(&self) -> &TypeGeneratorSettings {
-        &self.settings
+        self.settings
     }
 
     /// Generate a module containing all types defined in the supplied type registry.

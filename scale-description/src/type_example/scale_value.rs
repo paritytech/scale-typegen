@@ -22,9 +22,9 @@ pub fn scale_value_example_from_seed(
     seed: u64,
 ) -> anyhow::Result<Value> {
     fn error_on_recurse(
-        type_id: u32,
+        _type_id: u32,
         ty: &Type<PortableForm>,
-        transformer: &ValueTransformer,
+        _transformer: &ValueTransformer,
     ) -> anyhow::Result<Value> {
         Err(anyhow!(
             "Cannot generate scale value example for recursive type: {ty:?}"
@@ -36,7 +36,7 @@ pub fn scale_value_example_from_seed(
 }
 
 fn ty_example(
-    type_id: u32,
+    _type_id: u32,
     ty: &Type<PortableForm>,
     transformer: &ValueTransformer,
 ) -> anyhow::Result<Value> {

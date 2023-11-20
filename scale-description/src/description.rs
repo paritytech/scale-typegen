@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use anyhow::anyhow;
 use scale_info::{
     form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeDefArray, TypeDefBitSequence,
@@ -12,9 +10,9 @@ use super::formatting::format_type_description;
 
 pub fn type_description(type_id: u32, type_registry: &PortableRegistry) -> anyhow::Result<String> {
     fn return_type_name_on_recurse(
-        type_id: u32,
+        _type_id: u32,
         ty: &Type<PortableForm>,
-        transformer: &Transformer<String>,
+        _transformer: &Transformer<String>,
     ) -> anyhow::Result<String> {
         let type_name = ty
             .path
@@ -35,7 +33,7 @@ pub fn type_description(type_id: u32, type_registry: &PortableRegistry) -> anyho
 }
 
 fn ty_description(
-    type_id: u32,
+    _type_id: u32,
     ty: &Type<PortableForm>,
     transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {

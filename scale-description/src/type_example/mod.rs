@@ -6,14 +6,12 @@ pub use scale_value::scale_value_example;
 
 #[cfg(test)]
 mod tests {
-    use indoc::indoc;
-    use parity_scale_codec::Compact;
+
     use pretty_assertions::assert_eq;
     use scale_info::{PortableRegistry, TypeInfo};
 
     use crate::type_example::scale_value::scale_value_example_from_seed;
 
-    use super::rust_type_example;
     use super::scale_value_example;
 
     fn make_type<T: TypeInfo + 'static>() -> (u32, PortableRegistry) {
