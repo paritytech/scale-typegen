@@ -11,7 +11,7 @@ pub use description::type_description;
 mod tests {
     // Note: indoc is used to make it easier to represent multi-line strings.
     use indoc::indoc;
-    use parity_scale_codec::Compact;
+
     use pretty_assertions::assert_eq;
     use scale_info::{PortableRegistry, TypeInfo};
 
@@ -48,59 +48,59 @@ mod tests {
     }
     // todo!("This test with the generics does not fly yet.")
     // #[test]
-    fn enums() {
-        #[allow(unused)]
-        #[derive(TypeInfo)]
-        enum Shape<T> {
-            Inivisible,
-            Circle(u64),
-            Rect(Compact<u64>, Compact<u64>),
-            Polygon {
-                corners: u8,
-                radius: u64,
-            },
-            MultiShape {
-                shapes: Vec<Shape<u32>>,
-                t: T,
-                operation: Operation,
-            },
-        }
+    // fn enums() {
+    //     #[allow(unused)]
+    //     #[derive(TypeInfo)]
+    //     enum Shape<T> {
+    //         Inivisible,
+    //         Circle(u64),
+    //         Rect(Compact<u64>, Compact<u64>),
+    //         Polygon {
+    //             corners: u8,
+    //             radius: u64,
+    //         },
+    //         MultiShape {
+    //             shapes: Vec<Shape<u32>>,
+    //             t: T,
+    //             operation: Operation,
+    //         },
+    //     }
 
-        #[allow(unused)]
-        #[derive(TypeInfo)]
-        enum Operation {
-            Add,
-            Intersect,
-            Difference,
-        }
+    //     #[allow(unused)]
+    //     #[derive(TypeInfo)]
+    //     enum Operation {
+    //         Add,
+    //         Intersect,
+    //         Difference,
+    //     }
 
-        let (type_id, type_registry) = make_type::<Shape<bool>>();
+    //     let (type_id, type_registry) = make_type::<Shape<bool>>();
 
-        assert_eq!(
-            type_description(type_id, &type_registry).unwrap(),
-            indoc! {
-            "enum Shape {
-                Inivisible,
-                Circle(u64),
-                Rect(
-                    Compact<u64>,
-                    Compact<u64>
-                ),
-                Polygon  {
-                    corners: u8,
-                    radius: u64
-                },
-                MultiShape  {
-                    shapes: Vec<Shape>,
-                    operation: enum Operation {
-                        Add,
-                        Intersect,
-                        Difference
-                    }
-                }
-            }"}
-        );
-    }
+    //     assert_eq!(
+    //         type_description(type_id, &type_registry).unwrap(),
+    //         indoc! {
+    //         "enum Shape {
+    //             Inivisible,
+    //             Circle(u64),
+    //             Rect(
+    //                 Compact<u64>,
+    //                 Compact<u64>
+    //             ),
+    //             Polygon  {
+    //                 corners: u8,
+    //                 radius: u64
+    //             },
+    //             MultiShape  {
+    //                 shapes: Vec<Shape>,
+    //                 operation: enum Operation {
+    //                     Add,
+    //                     Intersect,
+    //                     Difference
+    //                 }
+    //             }
+    //         }"}
+    //     );
+    // }
 
     #[test]
     fn recursive_structs() {
