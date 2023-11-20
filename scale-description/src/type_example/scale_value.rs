@@ -21,17 +21,25 @@ pub fn scale_value_example_from_seed(
     types: &PortableRegistry,
     seed: u64,
 ) -> anyhow::Result<Value> {
-    fn error_on_recurse(ty: &Type<PortableForm>) -> anyhow::Result<Value> {
+    fn error_on_recurse(
+        type_id: u32,
+        ty: &Type<PortableForm>,
+        transformer: &ValueTransformer,
+    ) -> anyhow::Result<Value> {
         Err(anyhow!(
             "Cannot generate scale value example for recursive type: {ty:?}"
         ))
     }
     let state = RefCell::new(rand_chacha::ChaCha8Rng::seed_from_u64(seed));
-    let transformer = ValueTransformer::new(type_example, error_on_recurse, state, types);
+    let transformer = ValueTransformer::new(ty_example, error_on_recurse, state, types);
     transformer.resolve(id)
 }
 
-fn type_example(ty: &Type<PortableForm>, transformer: &ValueTransformer) -> anyhow::Result<Value> {
+fn ty_example(
+    type_id: u32,
+    ty: &Type<PortableForm>,
+    transformer: &ValueTransformer,
+) -> anyhow::Result<Value> {
     match &ty.type_def {
         TypeDef::Composite(composite) => {
             let fields = composite.fields.iter().map(|e| (e.name.as_ref(), e.ty.id));
@@ -42,15 +50,18 @@ fn type_example(ty: &Type<PortableForm>, transformer: &ValueTransformer) -> anyh
             })
         }
         TypeDef::Variant(variant) => {
-            let first = variant
+            let random_variant = variant
                 .variants
                 .choose(&mut *transformer.state().borrow_mut())
                 .ok_or_else(|| anyhow!("Variant type should have at least one variant"))?;
-            let fields = first.fields.iter().map(|e| (e.name.as_ref(), e.ty.id));
+            let fields = random_variant
+                .fields
+                .iter()
+                .map(|e| (e.name.as_ref(), e.ty.id));
             let composite = fields_type_example(fields, transformer)?;
             Ok(Value {
                 value: ValueDef::Variant(Variant {
-                    name: first.name.clone(),
+                    name: random_variant.name.clone(),
                     values: composite,
                 }),
                 context: (),

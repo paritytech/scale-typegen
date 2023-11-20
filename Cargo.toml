@@ -17,6 +17,7 @@ homepage = "https://www.parity.io/"
 
 # crates
 scale-description = { version = "0.0.1", path = "scale-description" }
+scale-typegen = { version = "0.0.1", path = "scale-typegen" }
 
 # external dependencies
 parity-scale-codec = { version = "3.6.5", features = ["derive"] }

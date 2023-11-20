@@ -19,9 +19,9 @@ pub struct Transformer<'a, R, S = ()> {
     /// keep this private such that the cache is sealed and connot be accessed from outside of the Transformer::transform function
     cache: RefCell<HashMap<u32, Cached<R>>>,
     /// state can be used for example for an Rng
-    state: S,
-    policy: fn(&Type<PortableForm>, &Self) -> anyhow::Result<R>,
-    recurse_policy: fn(&Type<PortableForm>) -> anyhow::Result<R>,
+    pub state: S,
+    policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
+    recurse_policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
     registry: &'a PortableRegistry,
 }
 
@@ -34,8 +34,8 @@ where
     }
 
     pub fn new(
-        policy: fn(&Type<PortableForm>, &Self) -> anyhow::Result<R>,
-        resurse_policy: fn(&Type<PortableForm>) -> anyhow::Result<R>,
+        policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
+        resurse_policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
         state: S,
         registry: &'a PortableRegistry,
     ) -> Self {
@@ -56,14 +56,14 @@ where
 
         match self.cache.borrow().get(&type_id) {
             Some(Cached::Recursive) => {
-                return (self.recurse_policy)(ty);
+                return (self.recurse_policy)(type_id, ty, self);
             }
             Some(Cached::Computed(r)) => return Ok(r.clone()),
             _ => {}
         };
 
         self.cache.borrow_mut().insert(type_id, Cached::Recursive);
-        let r = (self.policy)(ty, self)?;
+        let r = (self.policy)(type_id, ty, self)?;
         self.cache
             .borrow_mut()
             .insert(type_id, Cached::Computed(r.clone()));

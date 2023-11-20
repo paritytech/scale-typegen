@@ -29,6 +29,7 @@ rand_chacha = { version = "0.3.1", optional = true }
 rand = { version = "0.8.5", optional = true }
 
 scale-typegen = { workspace = true }
+quote.workspace = true
 
 
 [dev-dependencies]

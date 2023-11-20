@@ -34,14 +34,14 @@ impl Testgen {
 
     pub fn gen(self, settings: TypeGeneratorSettings) -> TokenStream {
         let registry: PortableRegistry = self.registry.into();
-        let type_gen = TypeGenerator::new(&registry, settings).unwrap();
+        let type_gen = TypeGenerator::new(&registry, &settings);
         let module = type_gen.generate_types_mod().unwrap();
         module.to_token_stream()
     }
 
     pub fn gen_tests_mod(self, settings: TypeGeneratorSettings) -> TokenStream {
         let registry: PortableRegistry = self.registry.into();
-        let type_gen = TypeGenerator::new(&registry, settings).unwrap();
+        let type_gen = TypeGenerator::new(&registry, &settings);
         let module = type_gen.generate_types_mod().unwrap();
         let module = get_mod(&module, TESTS_MOD_PATH).unwrap();
         module.to_token_stream()
@@ -50,7 +50,7 @@ impl Testgen {
 
 pub(super) fn subxt_settings() -> TypeGeneratorSettings {
     TypeGeneratorSettings {
-        type_mod_name: "root".into(),
+        types_mod_ident: parse_quote!(root),
         should_gen_docs: true,
         derives: subxt_default_derives(),
         substitutes: subxt_default_substitutes(),

@@ -11,7 +11,11 @@ use crate::transformer::Transformer;
 use super::formatting::format_type_description;
 
 pub fn type_description(type_id: u32, type_registry: &PortableRegistry) -> anyhow::Result<String> {
-    fn return_type_name_on_recurse(ty: &Type<PortableForm>) -> anyhow::Result<String> {
+    fn return_type_name_on_recurse(
+        type_id: u32,
+        ty: &Type<PortableForm>,
+        transformer: &Transformer<String>,
+    ) -> anyhow::Result<String> {
         let type_name = ty
             .path
             .ident()
@@ -31,6 +35,7 @@ pub fn type_description(type_id: u32, type_registry: &PortableRegistry) -> anyho
 }
 
 fn ty_description(
+    type_id: u32,
     ty: &Type<PortableForm>,
     transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {

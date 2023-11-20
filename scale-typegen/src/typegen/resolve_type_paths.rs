@@ -1,38 +1,10 @@
-use scale_info::{form::PortableForm, PortableRegistry, Type, TypeDef};
-use syn::Ident;
+use scale_info::{form::PortableForm, Type, TypeDef};
 
-use crate::TypegenError;
+use crate::{TypeGenerator, TypegenError};
 
-use super::{
-    settings::substitutes::TypeSubstitutes,
-    type_path::{TypeParameter, TypePath, TypePathType},
-};
+use super::type_path::{TypeParameter, TypePath, TypePathType};
 
-pub struct TypePathResolver<'a> {
-    registry: &'a PortableRegistry,
-    substitutes: &'a TypeSubstitutes,
-    decoded_bits_type_path: Option<&'a syn::Path>,
-    compact_type_path: Option<&'a syn::Path>,
-    root_mod_ident: &'a Ident,
-}
-
-impl<'a> TypePathResolver<'a> {
-    pub fn new(
-        registry: &'a PortableRegistry,
-        substitutes: &'a TypeSubstitutes,
-        decoded_bits_type_path: Option<&'a syn::Path>,
-        compact_type_path: Option<&'a syn::Path>,
-        root_mod_ident: &'a Ident,
-    ) -> Self {
-        Self {
-            registry,
-            substitutes,
-            decoded_bits_type_path,
-            root_mod_ident,
-            compact_type_path,
-        }
-    }
-
+impl<'a> TypeGenerator<'a> {
     /// Get the type path for a field of a struct or an enum variant, providing any generic
     /// type parameters from the containing type. This is for identifying where a generic type
     /// parameter is used in a field type e.g.
@@ -157,7 +129,9 @@ impl<'a> TypePathResolver<'a> {
                 )?;
 
                 let compact_type_path = self
+                    .settings
                     .compact_type_path
+                    .as_ref()
                     .ok_or(TypegenError::CompactPathNone)?
                     .clone();
 
@@ -169,7 +143,9 @@ impl<'a> TypePathResolver<'a> {
             }
             TypeDef::BitSequence(bitseq) => {
                 let decoded_bits_type_path = self
+                    .settings
                     .decoded_bits_type_path
+                    .as_ref()
                     .ok_or(TypegenError::DecodedBitsPathNone)?
                     .clone();
 
@@ -202,18 +178,22 @@ impl<'a> TypePathResolver<'a> {
         path: &scale_info::Path<PortableForm>,
         params: &[TypePath],
     ) -> TypePathType {
-        if let Some(substitute) = self.substitutes.for_path_with_params(path, params) {
+        if let Some(substitute) = self.settings.substitutes.for_path_with_params(path, params) {
             substitute
         } else {
-            TypePathType::from_type_def_path(path, self.root_mod_ident.clone(), params.to_vec())
+            TypePathType::from_type_def_path(
+                path,
+                self.settings.types_mod_ident.clone(),
+                params.to_vec(),
+            )
         }
     }
 
-    pub fn resolve_type(&self, id: u32) -> Result<Type<PortableForm>, TypegenError> {
+    pub fn resolve_type(&self, id: u32) -> Result<&Type<PortableForm>, TypegenError> {
         let ty = self
-            .registry
+            .type_registry
             .resolve(id)
             .ok_or(TypegenError::TypeNotFound(id))?;
-        Ok(ty.clone())
+        Ok(ty)
     }
 }

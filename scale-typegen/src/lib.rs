@@ -23,7 +23,6 @@ pub use typegen::{
         substitutes::TypeSubstitutes,
         TypeGeneratorSettings,
     },
-    type_path_resolver::TypePathResolver,
     TypeGenerator,
 };
 
