@@ -22,7 +22,7 @@ pub fn main() {
         .type_mod_name("my_types")
         .decoded_bits_type_path(parse_quote!(DecodedBits));
 
-    let type_generator = TypeGenerator::new(&type_registry, settings).unwrap();
+    let type_generator = TypeGenerator::new(&type_registry, &settings);
     let code = type_generator
         .generate_types_mod()
         .unwrap()

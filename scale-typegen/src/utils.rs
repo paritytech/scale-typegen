@@ -36,7 +36,7 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
                     continue 'outer;
                 }
             }
-            types_with_same_structure.push((&type_a, smallvec![id]));
+            types_with_same_structure.push((type_a, smallvec![id]));
         }
 
         // Now that the types that share a structure are grouped together, we can order commands to rename them.

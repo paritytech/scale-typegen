@@ -1,6 +1,8 @@
 use derives::DerivesRegistry;
 
+use proc_macro2::Ident;
 use substitutes::TypeSubstitutes;
+use syn::parse_quote;
 
 use self::substitutes::absolute_path;
 
@@ -9,7 +11,7 @@ pub mod substitutes;
 
 pub struct TypeGeneratorSettings {
     /// The name of the module which will contain the generated types.
-    pub type_mod_name: String,
+    pub types_mod_ident: Ident,
     /// If false, no docs are generated for the types.
     pub should_gen_docs: bool,
     /// Derive traits on generated types.
@@ -37,7 +39,7 @@ pub struct TypeGeneratorSettings {
 impl Default for TypeGeneratorSettings {
     fn default() -> Self {
         Self {
-            type_mod_name: "types".into(),
+            types_mod_ident: parse_quote!(types),
             should_gen_docs: true,
             substitutes: TypeSubstitutes::new(),
             derives: DerivesRegistry::new(),
@@ -55,7 +57,8 @@ impl TypeGeneratorSettings {
     }
 
     pub fn type_mod_name(mut self, type_mod_name: &str) -> Self {
-        self.type_mod_name = type_mod_name.into();
+        self.types_mod_ident =
+            syn::parse_str(type_mod_name).expect("The provided type_mod_name is not a valid ident");
         self
     }
 
