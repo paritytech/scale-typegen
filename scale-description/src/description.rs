@@ -14,11 +14,10 @@ pub fn type_description(type_id: u32, type_registry: &PortableRegistry) -> anyho
         ty: &Type<PortableForm>,
         _transformer: &Transformer<String>,
     ) -> anyhow::Result<String> {
-        let type_name = ty
-            .path
-            .ident()
-            .ok_or_else(|| anyhow!("Recursive type without type name encountered: {:?}", ty))?;
-        Ok(type_name)
+        if let Some(type_name) = ty.path.ident() {
+            return Ok(type_name);
+        }
+        Err(anyhow!("Recursive type that did not get handled properly"))
     }
 
     let transformer = Transformer::new(
