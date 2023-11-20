@@ -6,49 +6,49 @@ use self::{
     settings::TypeGeneratorSettings,
     type_params::TypeParameters,
     type_path::TypeParameter,
-    type_path_resolver::TypePathResolver,
 };
 
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use scale_info::{form::PortableForm, PortableRegistry, PortableType, Type, TypeDef};
+use scale_info::{form::PortableForm, PortableRegistry, Type, TypeDef};
 use syn::parse_quote;
 
 pub mod error;
 pub mod ir;
+pub mod resolve_type_paths;
 pub mod settings;
 pub mod type_params;
 pub mod type_path;
-pub mod type_path_resolver;
 
 /// An interface for generating a types module.
 pub struct TypeGenerator<'a> {
     type_registry: &'a PortableRegistry,
-    pub settings: TypeGeneratorSettings,
-    root_mod_ident: Ident,
+    settings: &'a TypeGeneratorSettings,
 }
 
 impl<'a> TypeGenerator<'a> {
     /// Construct a new [`TypeGenerator`].
-    pub fn new(
-        type_registry: &'a PortableRegistry,
-        settings: TypeGeneratorSettings,
-    ) -> Result<Self, TypegenError> {
-        let root_mod_ident: Ident = syn::parse_str(&settings.type_mod_name)?;
-        Ok(Self {
+    pub fn new(type_registry: &'a PortableRegistry, settings: &'a TypeGeneratorSettings) -> Self {
+        Self {
             type_registry,
             settings,
-            root_mod_ident,
-        })
+        }
     }
 
     pub fn types_mod_ident(&self) -> &Ident {
-        &self.root_mod_ident
+        &self.settings.types_mod_ident
+    }
+
+    pub fn settings(&self) -> &TypeGeneratorSettings {
+        self.settings
     }
 
     /// Generate a module containing all types defined in the supplied type registry.
     pub fn generate_types_mod(&self) -> Result<ModuleIR, TypegenError> {
-        let mut root_mod = ModuleIR::new(self.root_mod_ident.clone(), self.root_mod_ident.clone());
+        let mut root_mod = ModuleIR::new(
+            self.settings.types_mod_ident.clone(),
+            self.settings.types_mod_ident.clone(),
+        );
 
         for ty in &self.type_registry.types {
             let path = &ty.ty.path;
@@ -65,7 +65,7 @@ impl<'a> TypeGenerator<'a> {
             }
 
             // if the type is not a builtin type, insert it into the respective module
-            if let Some(type_ir) = self.create_type_ir(ty)? {
+            if let Some(type_ir) = self.create_type_ir(&ty.ty)? {
                 // Create the module this type should go into
                 let innermost_module = root_mod.get_or_insert_submodule(namespace);
                 innermost_module.types.insert(path.clone(), type_ir);
@@ -75,9 +75,7 @@ impl<'a> TypeGenerator<'a> {
         Ok(root_mod)
     }
 
-    fn create_type_ir(&self, ty: &PortableType) -> Result<Option<TypeIR>, TypegenError> {
-        let PortableType { ty, id: _ } = &ty;
-
+    pub fn create_type_ir(&self, ty: &Type<PortableForm>) -> Result<Option<TypeIR>, TypegenError> {
         // if the type is some builtin, early return, we are only interested in generating structs and enums.
         if !matches!(ty.type_def, TypeDef::Composite(_) | TypeDef::Variant(_)) {
             return Ok(None);
@@ -153,8 +151,6 @@ impl<'a> TypeGenerator<'a> {
         fields: &[scale_info::Field<PortableForm>],
         type_params: &mut TypeParameters,
     ) -> Result<CompositeIRKind, TypegenError> {
-        let type_path_resolver = self.type_path_resolver();
-
         if fields.is_empty() {
             return Ok(CompositeIRKind::NoFields);
         }
@@ -173,7 +169,7 @@ impl<'a> TypeGenerator<'a> {
                     let field_name = field.name.as_ref().unwrap();
                     let ident = syn::parse_str::<Ident>(field_name)?;
 
-                    let path = type_path_resolver.resolve_field_type_path(
+                    let path = self.resolve_field_type_path(
                         field.ty.id,
                         type_params.params(),
                         field.type_name.as_deref(),
@@ -197,7 +193,7 @@ impl<'a> TypeGenerator<'a> {
             let unnamed_fields = fields
                 .iter()
                 .map(|field| {
-                    let path = type_path_resolver.resolve_field_type_path(
+                    let path = self.resolve_field_type_path(
                         field.ty.id,
                         type_params.params(),
                         field.type_name.as_deref(),
@@ -221,16 +217,6 @@ impl<'a> TypeGenerator<'a> {
         } else {
             unreachable!("Is either all unnamed or all named. qed.")
         }
-    }
-
-    pub fn type_path_resolver(&self) -> TypePathResolver<'_> {
-        TypePathResolver::new(
-            self.type_registry,
-            &self.settings.substitutes,
-            self.settings.decoded_bits_type_path.as_ref(),
-            self.settings.compact_type_path.as_ref(),
-            &self.root_mod_ident,
-        )
     }
 
     pub fn upcast_composite(&self, composite: &CompositeIR) -> TypeIR {
