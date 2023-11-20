@@ -1,5 +1,5 @@
 [workspace]
-members = ["scale-typegen", "scale-description"]
+members = ["typegen", "description"]
 resolver = "2"
 
 
@@ -15,9 +15,8 @@ homepage = "https://www.parity.io/"
 
 [workspace.dependencies]
 
-# crates
-scale-description = { version = "0.0.1", path = "scale-description" }
-scale-typegen = { version = "0.0.1", path = "scale-typegen" }
+scale-typegen-description = { version = "0.0.1", path = "description" }
+scale-typegen = { version = "0.0.1", path = "typegen" }
 
 # external dependencies
 parity-scale-codec = { version = "3.6.5", features = ["derive"] }
@@ -42,3 +41,4 @@ serde_json = "1.0.108"
 bitvec = { version = "1", default-features = false }
 pretty_assertions = "1.4.0"
 anyhow = "1.0.75"
+# crates

@@ -336,7 +336,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae005bd773ab59b4725093fd7df83fd7892f7d8eafb48dbd7de6e024e4215f9d"
 dependencies = [
  "proc-macro2",
- "syn 2.0.38",
+ "syn 2.0.39",
 ]
 
 [[package]]
@@ -472,25 +472,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "scale-description"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "indoc",
- "parity-scale-codec",
- "peekmore",
- "pretty_assertions",
- "proc-macro2",
- "quote",
- "rand",
- "rand_chacha",
- "scale-info",
- "scale-typegen",
- "scale-value",
- "smallvec",
-]
-
-[[package]]
 name = "scale-encode"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -561,8 +542,27 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
- "syn 2.0.38",
+ "syn 2.0.39",
  "thiserror",
+]
+
+[[package]]
+name = "scale-typegen-description"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "indoc",
+ "parity-scale-codec",
+ "peekmore",
+ "pretty_assertions",
+ "proc-macro2",
+ "quote",
+ "rand",
+ "rand_chacha",
+ "scale-info",
+ "scale-typegen",
+ "scale-value",
+ "smallvec",
 ]
 
 [[package]]
@@ -602,7 +602,7 @@ checksum = "d6c7207fbec9faa48073f3e3074cbe553af6ea512d7c21ba46e434e70ea9fbc1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.38",
+ "syn 2.0.39",
 ]
 
 [[package]]
@@ -653,9 +653,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.38"
+version = "2.0.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e96b79aaa137db8f61e26363a0c9b47d8b4ec75da28b7d1d614c2303e232408b"
+checksum = "23e78b90f2fcf45d3e842032ce32e3f2d1545ba6636271dcbf24fa306d87be7a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -685,7 +685,7 @@ checksum = "266b2e40bc00e5a6c09c3584011e08b06f123c00362c92b975ba9843aaaa14b8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.38",
+ "syn 2.0.39",
 ]
 
 [[package]]
@@ -743,9 +743,9 @@ checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
 name = "winnow"
-version = "0.5.18"
+version = "0.5.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "176b6138793677221d420fd2f0aeeced263f197688b36484660da767bca2fa32"
+checksum = "829846f3e3db426d4cee4510841b71a8e58aa2a76b1132579487ae430ccd9c7b"
 dependencies = [
  "memchr",
 ]

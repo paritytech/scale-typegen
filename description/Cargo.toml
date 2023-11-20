@@ -1,5 +1,5 @@
 [package]
-name = "scale-description"
+name = "scale-typegen-description"
 version = "0.0.1"
 edition = "2021"
 
