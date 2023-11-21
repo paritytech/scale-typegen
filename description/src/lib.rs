@@ -5,7 +5,14 @@ mod transformer;
 #[cfg(feature = "type-example")]
 pub mod type_example;
 
+#[cfg(feature = "type-example")]
+pub use type_example::{
+    rust_value::{example as rust_value, example_from_seed as rust_value_from_seed},
+    scale_value::{example as scale_value, example_from_seed as scale_value_from_seed},
+};
+
 pub use description::type_description;
+pub use formatting::format_type_description;
 
 #[cfg(test)]
 mod tests {
@@ -37,7 +44,7 @@ mod tests {
         let (type_id, type_registry) = make_type::<Human>();
 
         assert_eq!(
-            type_description(type_id, &type_registry).unwrap(),
+            type_description(type_id, &type_registry, true).unwrap(),
             indoc! {
             "Human {
                 name: String,
@@ -122,7 +129,7 @@ mod tests {
         let (type_id, type_registry) = make_type::<Human>();
 
         assert_eq!(
-            type_description(type_id, &type_registry).unwrap(),
+            type_description(type_id, &type_registry, true).unwrap(),
             indoc! {
             "Human {
                 name: String,

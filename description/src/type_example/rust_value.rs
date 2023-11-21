@@ -100,15 +100,15 @@ impl<'a> CodeTransformer<'a> {
     }
 }
 
-pub fn rust_type_example(
+pub fn example(
     type_id: u32,
     types: &PortableRegistry,
     settings_for_path_resolver: TypeGeneratorSettings,
 ) -> anyhow::Result<TokenStream> {
-    rust_type_example_from_seed(type_id, types, settings_for_path_resolver, 42, None, None)
+    example_from_seed(type_id, types, settings_for_path_resolver, 42, None, None)
 }
 
-pub fn rust_type_example_from_seed(
+pub fn example_from_seed(
     type_id: u32,
     types: &PortableRegistry,
     settings_for_path_resolver: TypeGeneratorSettings,

@@ -4,11 +4,16 @@ use scale_info::{
     TypeDefCompact, TypeDefPrimitive, TypeDefSequence, TypeDefTuple, TypeDefVariant, Variant,
 };
 
-use crate::transformer::Transformer;
+use crate::{description, transformer::Transformer};
 
 use super::formatting::format_type_description;
 
-pub fn type_description(type_id: u32, type_registry: &PortableRegistry) -> anyhow::Result<String> {
+/// if format is enabled, `format_type_description` is applied to the end result.
+pub fn type_description(
+    type_id: u32,
+    type_registry: &PortableRegistry,
+    format: bool,
+) -> anyhow::Result<String> {
     fn return_type_name_on_recurse(
         _type_id: u32,
         ty: &Type<PortableForm>,
@@ -26,9 +31,12 @@ pub fn type_description(type_id: u32, type_registry: &PortableRegistry) -> anyho
         (),
         type_registry,
     );
-    let description = transformer.resolve(type_id)?;
-    let formatted = format_type_description(&description);
-    Ok(formatted)
+    let mut description = transformer.resolve(type_id)?;
+    if format {
+        description = format_type_description(&description);
+    }
+
+    Ok(description)
 }
 
 fn ty_description(

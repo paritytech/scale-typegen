@@ -10,12 +10,7 @@ edition = "2021"
 
 [features]
 default = ["type-example"]
-type-example = [
-    "dep:scale-value",
-    "dep:proc-macro2",
-    "dep:rand_chacha",
-    "dep:rand",
-]
+type-example = ["dep:scale-value", "dep:proc-macro2", "dep:rand_chacha", "dep:rand"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -29,8 +24,7 @@ rand_chacha = { version = "0.3.1", optional = true }
 rand = { version = "0.8.5", optional = true }
 
 scale-typegen = { workspace = true }
-quote.workspace = true
-
+quote = { workspace = true }
 
 [dev-dependencies]
 indoc = "2"

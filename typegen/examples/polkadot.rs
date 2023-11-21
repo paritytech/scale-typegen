@@ -14,8 +14,6 @@ pub struct DecodedBits<Store, Order> {
 }
 
 /// This example shows how to use metadata from a polkadot node to generate rust types.
-///
-/// Some types might need
 pub fn main() {
     let type_registry = read_registry_from_json();
     let settings = TypeGeneratorSettings::default()
