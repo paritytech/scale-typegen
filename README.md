@@ -1,5 +1,7 @@
 # scale-typegen
 
+**Currently a work in progress**
+
 A library based on [scale-info](https://github.com/paritytech/scale-info) to transpile portable registries of types into rust type definitions.
 This library exposes a `TypeGenerator` struct which wants to be given two things:
 
