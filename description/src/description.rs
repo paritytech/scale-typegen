@@ -4,7 +4,7 @@ use scale_info::{
     TypeDefCompact, TypeDefPrimitive, TypeDefSequence, TypeDefTuple, TypeDefVariant, Variant,
 };
 
-use crate::{description, transformer::Transformer};
+use crate::transformer::Transformer;
 
 use super::formatting::format_type_description;
 

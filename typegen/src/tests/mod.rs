@@ -1012,7 +1012,103 @@ fn apply_user_defined_derives_for_specific_types() {
 }
 
 #[test]
-fn opt_out_from_default_derives() {
+fn apply_recursive_derives() {
+    use std::collections::BTreeMap;
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct Human {
+        organ_status: BTreeMap<Organ, Status>,
+        profession: Profession,
+        organs: Vec<Organ>,
+    }
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    enum Organ {
+        Heart,
+        Stomach,
+    }
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct Status {
+        damage: Compact<u32>,
+    }
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    enum Profession {
+        Student { college: String },
+        Programmer,
+    }
+
+    let mut derives = DerivesRegistry::new();
+
+    derives.extend_for_type(
+        parse_quote!(scale_typegen::tests::Human),
+        vec![parse_quote!(Reflect)],
+        vec![parse_quote!(#[is_human])],
+        false,
+    );
+
+    derives.extend_for_type(
+        parse_quote!(scale_typegen::tests::Human),
+        vec![parse_quote!(Clone)],
+        vec![parse_quote!(#[is_nice])],
+        true,
+    );
+
+    let settings = TypeGeneratorSettings {
+        derives,
+        ..subxt_settings()
+    };
+    let code = Testgen::new().with::<Human>().gen_tests_mod(settings);
+
+    let expected_code = quote! {
+        pub mod tests {
+            use super::root;
+            #[derive(Clone, Reflect)]
+            #[is_human]
+            #[is_nice]
+            pub struct Human {
+                pub organ_status: ::subxt_path::utils::KeyedVec<
+                    root::scale_typegen::tests::Organ,
+                    root::scale_typegen::tests::Status
+                >,
+                pub profession: root::scale_typegen::tests::Profession,
+                pub organs: ::std::vec::Vec<root::scale_typegen::tests::Organ>,
+            }
+            #[derive(Clone)]
+            #[is_nice]
+            pub enum Organ {
+                #[codec(index = 0)]
+                Heart,
+                #[codec(index = 1)]
+                Stomach,
+            }
+            #[derive(Clone)]
+            #[is_nice]
+            pub enum Profession {
+                #[codec(index = 0)]
+                Student { college: ::std::string::String , },
+                #[codec(index = 1)]
+                Programmer,
+            }
+            #[derive(Clone)]
+            #[is_nice]
+            pub struct Status {
+                #[codec(compact)]
+                pub damage: ::core::primitive::u32,
+            }
+        }
+    };
+
+    assert_eq!(code.to_string(), expected_code.to_string());
+}
+
+#[test]
+fn apply_derives() {
     #[allow(unused)]
     #[derive(TypeInfo)]
     struct A(B);
@@ -1060,7 +1156,7 @@ fn opt_out_from_default_derives() {
 /// By default a BTreeMap would be replaced by a KeyedVec.
 /// This test demonstrates that it does not happen if we opt out of default type substitutes.
 #[test]
-fn opt_out_from_default_substitutes() {
+fn apply_custom_substitutes() {
     use std::collections::BTreeMap;
 
     #[allow(unused)]

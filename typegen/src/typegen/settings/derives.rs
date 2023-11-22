@@ -32,6 +32,9 @@ impl DerivesRegistry {
     }
 
     /// Insert derives to be applied to a specific generated type.
+    ///
+    /// The `recursive` flag can be set if child types should also receive the given derives/attributes.
+    /// Child types are all types that are mentioned as fields or type parameters of the type.
     pub fn extend_for_type(
         &mut self,
         ty: syn::TypePath,
@@ -134,7 +137,9 @@ impl ToTokens for Derives {
     }
 }
 
-/// This is like a DerivesRegistry, but the recursive type derives have been flattened out into the specific_type_derives.
+/// This is like a DerivesRegistry, but the recursive type derives have been flattened out into specific_type_derives.
+///
+/// Can be constructed properly using a DerivesRegistry and a PortableRegistry with `DerivesRegistry::flatten_recursive_derives()`.
 #[derive(Debug, Clone, Default)]
 pub struct FlatDerivesRegistry {
     default_derives: Derives,
@@ -142,7 +147,7 @@ pub struct FlatDerivesRegistry {
 }
 
 impl FlatDerivesRegistry {
-    /// Resolve the derives for a specific type.
+    /// Resolve the derives for a specific type path.
     pub fn resolve(&self, ty: &syn::TypePath) -> Derives {
         let mut resolved_derives = self.default_derives.clone();
         if let Some(specific) = self.specific_type_derives.get(ty) {
@@ -151,6 +156,7 @@ impl FlatDerivesRegistry {
         resolved_derives
     }
 
+    /// Resolve the derives for a specific type.
     pub fn resolve_derives_for_type(
         &self,
         ty: &Type<PortableForm>,
@@ -160,6 +166,8 @@ impl FlatDerivesRegistry {
 }
 
 impl DerivesRegistry {
+    /// Flattens out the recursive derives into specific derives.
+    /// For this it needs to have a PortableRegistry that it can traverse recursively.
     pub fn flatten_recursive_derives(
         self,
         types: &PortableRegistry,
@@ -181,9 +189,15 @@ impl DerivesRegistry {
         let mut syn_path_for_id: HashMap<u32, syn::TypePath> = types
             .types
             .iter()
-            .map(|t| {
-                let path = syn_type_path(&t.ty)?;
-                Ok((t.id, path))
+            .filter_map(|t| {
+                if t.ty.path.is_empty() {
+                    None
+                } else {
+                    match syn_type_path(&t.ty) {
+                        Ok(path) => Some(Ok((t.id, path))),
+                        Err(err) => Some(Err(err)),
+                    }
+                }
             })
             .collect::<Result<_, TypegenError>>()?;
 
@@ -192,8 +206,11 @@ impl DerivesRegistry {
 
         // Check for each type in the registry if it is the top level of
         for ty in types.types.iter() {
-            let path = syn_path_for_id.get(&ty.id).expect("inserted above; qed;");
-            let Some(recursive_derives) = recursive_type_derives.remove(&path) else {
+            let Some(path) = syn_path_for_id.get(&ty.id) else {
+                // this is only the case for types with empty path (i.e. builtin types).
+                continue;
+            };
+            let Some(recursive_derives) = recursive_type_derives.remove(path) else {
                 continue;
             };
             // The collected_type_ids contain the id of the type itself and all ids of its fields:
@@ -211,13 +228,12 @@ impl DerivesRegistry {
 
         // Merge all the recursively obtained derives with the existing derives for the types.
         for (id, derived_to_add) in add_derives_for_id {
-            let path = syn_path_for_id
-                .remove(&id)
-                .expect("syn_path_for_id contains all type ids; qed;");
-            specific_type_derives
-                .entry(path)
-                .or_default()
-                .extend_from(derived_to_add);
+            if let Some(path) = syn_path_for_id.remove(&id) {
+                specific_type_derives
+                    .entry(path)
+                    .or_default()
+                    .extend_from(derived_to_add);
+            }
         }
 
         Ok(FlatDerivesRegistry {
