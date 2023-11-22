@@ -969,6 +969,7 @@ fn apply_user_defined_derives_for_specific_types() {
         parse_quote!(scale_typegen::tests::B),
         [parse_quote!(Hash)],
         [parse_quote!(#[some_attribute])],
+        false,
     );
     settings.derives.extend_for_type(
         parse_quote!(scale_typegen::tests::C),
@@ -978,6 +979,7 @@ fn apply_user_defined_derives_for_specific_types() {
             parse_quote!(PartialOrd),
         ],
         [],
+        false,
     );
     let code = Testgen::new().with::<A>().gen_tests_mod(settings);
 
@@ -1028,6 +1030,7 @@ fn opt_out_from_default_derives() {
         parse_quote!(scale_typegen::tests::B),
         vec![parse_quote!(Hash)],
         vec![parse_quote!(#[some_other_attribute])],
+        false,
     );
 
     let settings = TypeGeneratorSettings {

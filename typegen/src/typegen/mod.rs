@@ -3,7 +3,7 @@ use crate::{Derives, TypegenError};
 use self::{
     ir::module_ir::ModuleIR,
     ir::type_ir::{CompositeFieldIR, CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
-    settings::TypeGeneratorSettings,
+    settings::{derives::FlatDerivesRegistry, TypeGeneratorSettings},
     type_params::TypeParameters,
     type_path::TypeParameter,
 };
@@ -45,6 +45,12 @@ impl<'a> TypeGenerator<'a> {
 
     /// Generate a module containing all types defined in the supplied type registry.
     pub fn generate_types_mod(&self) -> Result<ModuleIR, TypegenError> {
+        let flat_derives_registry = self
+            .settings
+            .derives
+            .clone()
+            .flatten_recursive_derives(self.type_registry)?;
+
         let mut root_mod = ModuleIR::new(
             self.settings.types_mod_ident.clone(),
             self.settings.types_mod_ident.clone(),
@@ -65,7 +71,7 @@ impl<'a> TypeGenerator<'a> {
             }
 
             // if the type is not a builtin type, insert it into the respective module
-            if let Some(type_ir) = self.create_type_ir(&ty.ty)? {
+            if let Some(type_ir) = self.create_type_ir(&ty.ty, &flat_derives_registry)? {
                 // Create the module this type should go into
                 let innermost_module = root_mod.get_or_insert_submodule(namespace);
                 innermost_module.types.insert(path.clone(), type_ir);
@@ -75,7 +81,11 @@ impl<'a> TypeGenerator<'a> {
         Ok(root_mod)
     }
 
-    pub fn create_type_ir(&self, ty: &Type<PortableForm>) -> Result<Option<TypeIR>, TypegenError> {
+    pub fn create_type_ir(
+        &self,
+        ty: &Type<PortableForm>,
+        flat_derives_registry: &FlatDerivesRegistry,
+    ) -> Result<Option<TypeIR>, TypegenError> {
         // if the type is some builtin, early return, we are only interested in generating structs and enums.
         if !matches!(ty.type_def, TypeDef::Composite(_) | TypeDef::Variant(_)) {
             return Ok(None);
@@ -124,7 +134,7 @@ impl<'a> TypeGenerator<'a> {
             _ => unreachable!("Other variants early return before. qed."),
         };
 
-        let mut derives = self.type_derives(ty)?;
+        let mut derives = flat_derives_registry.resolve_derives_for_type(ty)?;
         if could_derive_as_compact {
             self.add_as_compact_derive(&mut derives);
         }
@@ -235,13 +245,6 @@ impl<'a> TypeGenerator<'a> {
 
     pub fn default_derives(&self) -> &Derives {
         self.settings.derives.default_derives()
-    }
-
-    pub fn type_derives(&self, ty: &Type<PortableForm>) -> Result<Derives, TypegenError> {
-        let joined_path = ty.path.segments.join("::");
-        let ty_path: syn::TypePath = syn::parse_str(&joined_path)?;
-        let derives = self.settings.derives.resolve(&ty_path);
-        Ok(derives)
     }
 
     /// Adds a AsCompact derive, if a path to AsCompact trait/derive macro set in settings.

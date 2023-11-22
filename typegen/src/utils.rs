@@ -2,6 +2,14 @@ use scale_info::{form::PortableForm, Field, PortableRegistry, Type, TypeDef, Typ
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
 
+use crate::TypegenError;
+
+pub fn syn_type_path(ty: &Type<PortableForm>) -> Result<syn::TypePath, TypegenError> {
+    let joined_path = ty.path.segments.join("::");
+    let ty_path: syn::TypePath = syn::parse_str(&joined_path)?;
+    Ok(ty_path)
+}
+
 pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
     let mut types_with_same_type_path = HashMap::<&[String], SmallVec<[u32; 2]>>::new();
 

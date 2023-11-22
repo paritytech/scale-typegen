@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use quote::ToTokens;
+use scale_info::{form::PortableForm, PortableRegistry, Type};
+
+use crate::{utils::syn_type_path, TypegenError};
 
 /// A struct containing the derives that we'll be applying to types;
 /// a combination of some common derives for all types, plus type
@@ -9,6 +12,7 @@ use quote::ToTokens;
 pub struct DerivesRegistry {
     default_derives: Derives,
     specific_type_derives: HashMap<syn::TypePath, Derives>,
+    recursive_type_derives: HashMap<syn::TypePath, Derives>,
 }
 
 impl DerivesRegistry {
@@ -33,8 +37,13 @@ impl DerivesRegistry {
         ty: syn::TypePath,
         derives: impl IntoIterator<Item = syn::Path>,
         attributes: impl IntoIterator<Item = syn::Attribute>,
+        recursive: bool,
     ) {
-        let type_derives = self.specific_type_derives.entry(ty).or_default();
+        let type_derives = if recursive {
+            self.recursive_type_derives.entry(ty).or_default()
+        } else {
+            self.specific_type_derives.entry(ty).or_default()
+        };
         type_derives.derives.extend(derives);
         type_derives.attributes.extend(attributes);
     }
@@ -42,18 +51,6 @@ impl DerivesRegistry {
     /// Returns the derives to be applied to all generated types.
     pub fn default_derives(&self) -> &Derives {
         &self.default_derives
-    }
-
-    /// Resolve the derives for a generated type. Includes:
-    ///     - The default derives for all types e.g. `scale::Encode, scale::Decode`
-    ///     - Any user-defined derives for all types via `generated_type_derives`
-    ///     - Any user-defined derives for this specific type
-    pub fn resolve(&self, ty: &syn::TypePath) -> Derives {
-        let mut resolved_derives = self.default_derives.clone();
-        if let Some(specific) = self.specific_type_derives.get(ty) {
-            resolved_derives.extend_from(specific.clone());
-        }
-        resolved_derives
     }
 }
 
@@ -134,5 +131,150 @@ impl ToTokens for Derives {
                 #( #sorted )*
             })
         }
+    }
+}
+
+/// This is like a DerivesRegistry, but the recursive type derives have been flattened out into the specific_type_derives.
+#[derive(Debug, Clone, Default)]
+pub struct FlatDerivesRegistry {
+    default_derives: Derives,
+    specific_type_derives: HashMap<syn::TypePath, Derives>,
+}
+
+impl FlatDerivesRegistry {
+    /// Resolve the derives for a specific type.
+    pub fn resolve(&self, ty: &syn::TypePath) -> Derives {
+        let mut resolved_derives = self.default_derives.clone();
+        if let Some(specific) = self.specific_type_derives.get(ty) {
+            resolved_derives.extend_from(specific.clone());
+        }
+        resolved_derives
+    }
+
+    pub fn resolve_derives_for_type(
+        &self,
+        ty: &Type<PortableForm>,
+    ) -> Result<Derives, TypegenError> {
+        Ok(self.resolve(&syn_type_path(ty)?))
+    }
+}
+
+impl DerivesRegistry {
+    pub fn flatten_recursive_derives(
+        self,
+        types: &PortableRegistry,
+    ) -> Result<FlatDerivesRegistry, TypegenError> {
+        let DerivesRegistry {
+            default_derives,
+            mut specific_type_derives,
+            mut recursive_type_derives,
+        } = self;
+
+        if recursive_type_derives.is_empty() {
+            return Ok(FlatDerivesRegistry {
+                default_derives,
+                specific_type_derives,
+            });
+        }
+
+        // Build a mapping of type ids to syn paths for all types in the registry:
+        let mut syn_path_for_id: HashMap<u32, syn::TypePath> = types
+            .types
+            .iter()
+            .map(|t| {
+                let path = syn_type_path(&t.ty)?;
+                Ok((t.id, path))
+            })
+            .collect::<Result<_, TypegenError>>()?;
+
+        // Create an empty map of derives that we are about to fill:
+        let mut add_derives_for_id: HashMap<u32, Derives> = HashMap::new();
+
+        // Check for each type in the registry if it is the top level of
+        for ty in types.types.iter() {
+            let path = syn_path_for_id.get(&ty.id).expect("inserted above; qed;");
+            let Some(recursive_derives) = recursive_type_derives.remove(&path) else {
+                continue;
+            };
+            // The collected_type_ids contain the id of the type itself and all ids of its fields:
+            let mut collected_type_ids: HashSet<u32> = HashSet::new();
+            collect_type_ids(ty.id, types, &mut collected_type_ids);
+
+            // We collect the derives for each type id in the add_derives_for_id HashMap.
+            for id in collected_type_ids {
+                add_derives_for_id
+                    .entry(id)
+                    .or_default()
+                    .extend_from(recursive_derives.clone());
+            }
+        }
+
+        // Merge all the recursively obtained derives with the existing derives for the types.
+        for (id, derived_to_add) in add_derives_for_id {
+            let path = syn_path_for_id
+                .remove(&id)
+                .expect("syn_path_for_id contains all type ids; qed;");
+            specific_type_derives
+                .entry(path)
+                .or_default()
+                .extend_from(derived_to_add);
+        }
+
+        Ok(FlatDerivesRegistry {
+            default_derives,
+            specific_type_derives,
+        })
+    }
+}
+
+fn collect_type_ids(id: u32, types: &PortableRegistry, collected_types: &mut HashSet<u32>) {
+    // Recursion protection:
+    if collected_types.contains(&id) {
+        return;
+    }
+
+    // Add the type id itself as well:
+    collected_types.insert(id);
+    let ty = types
+        .resolve(id)
+        .expect("Should contain this id, if Registry not corrupted");
+
+    // Collect the types that are passed as type params (Question/Note: Is this necessary? Maybe not...)
+    for param in ty.type_params.iter() {
+        if let Some(id) = param.ty.map(|e| e.id) {
+            collect_type_ids(id, types, collected_types);
+        }
+    }
+
+    // Collect ids depending on the types structure:
+    match &ty.type_def {
+        scale_info::TypeDef::Composite(def) => {
+            for f in def.fields.iter() {
+                collect_type_ids(f.ty.id, types, collected_types);
+            }
+        }
+        scale_info::TypeDef::Variant(def) => {
+            for v in def.variants.iter() {
+                for f in v.fields.iter() {
+                    collect_type_ids(f.ty.id, types, collected_types);
+                }
+            }
+        }
+        scale_info::TypeDef::Sequence(def) => {
+            collect_type_ids(def.type_param.id, types, collected_types);
+        }
+        scale_info::TypeDef::Array(def) => {
+            collect_type_ids(def.type_param.id, types, collected_types);
+        }
+        scale_info::TypeDef::Tuple(def) => {
+            for f in def.fields.iter() {
+                collect_type_ids(f.id, types, collected_types);
+            }
+        }
+        scale_info::TypeDef::Primitive(_) => {}
+        scale_info::TypeDef::Compact(def) => {
+            collect_type_ids(def.type_param.id, types, collected_types);
+        }
+        scale_info::TypeDef::BitSequence(_) => {}
     }
 }

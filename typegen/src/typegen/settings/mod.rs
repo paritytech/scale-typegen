@@ -1,5 +1,4 @@
 use derives::DerivesRegistry;
-
 use proc_macro2::Ident;
 use substitutes::TypeSubstitutes;
 use syn::parse_quote;

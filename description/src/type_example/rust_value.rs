@@ -58,7 +58,7 @@ impl<'a> CodeTransformer<'a> {
         let has_unused_type_params = self
             .state
             .type_generator
-            .create_type_ir(ty)
+            .create_type_ir(ty, &Default::default()) // Note: derives not important here.
             .map_err(|e| anyhow!("{e}"))?
             .map(|e| e.type_params.has_unused_type_params())
             .unwrap_or(false);
