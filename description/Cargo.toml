@@ -29,4 +29,3 @@ quote = { workspace = true }
 [dev-dependencies]
 indoc = "2"
 pretty_assertions = { workspace = true }
-parity-scale-codec = { workspace = true }

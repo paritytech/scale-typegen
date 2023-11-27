@@ -9,20 +9,17 @@ repository = "https://github.com/paritytech/scale-typegen"
 description = "Type Generation for SCALE encoded Rust Types"
 
 [dependencies]
-parity-scale-codec = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
-scale-bits = { workspace = true }
 scale-info = { workspace = true }
 smallvec = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+scale-bits = { workspace = true }
+parity-scale-codec = { workspace = true }
 prettyplease = { workspace = true }
-scale-decode = { workspace = true }
-scale-encode = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
+frame-metadata = { workspace = true }
 bitvec = { workspace = true }
 pretty_assertions = { workspace = true }

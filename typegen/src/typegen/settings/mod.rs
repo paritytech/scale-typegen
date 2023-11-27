@@ -68,6 +68,16 @@ impl TypeGeneratorSettings {
         self
     }
 
+    pub fn compact_as_type_path(mut self, path: syn::Path) -> Self {
+        self.compact_as_type_path = Some(path);
+        self
+    }
+
+    pub fn compact_type_path(mut self, path: syn::Path) -> Self {
+        self.compact_type_path = Some(path);
+        self
+    }
+
     pub fn decoded_bits_type_path(mut self, path: syn::Path) -> Self {
         self.decoded_bits_type_path = Some(path);
         self

@@ -12,6 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![deny(unused_crate_dependencies)]
+
+#[cfg(test)]
+use frame_metadata as _;
+#[cfg(test)]
+use prettyplease as _;
+#[cfg(test)]
+use scale_bits as _;
+
 pub mod typegen;
 pub mod utils;
 

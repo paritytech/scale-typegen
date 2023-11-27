@@ -23,21 +23,14 @@ parity-scale-codec = { version = "3.6.5", features = ["derive"] }
 proc-macro2 = "1.0.69"
 quote = "1.0.33"
 scale-bits = "0.4.0"
-scale-info = { version = "2.10.0", features = [
-    "derive",
-    "bitvec",
-    "decode",
-    "docs",
-    "serde",
-] }
+scale-info = { version = "2.10.0", features = ["derive", "bitvec", "decode", "docs", "serde"] }
 smallvec = "1.11.2"
 syn = { version = "2.0.38", features = ["full", "extra-traits"] }
 thiserror = "1.0.50"
 prettyplease = "0.2.15"
 scale-decode = "0.9.0"
 scale-encode = "0.5.0"
-serde = "1.0.192"
-serde_json = "1.0.108"
+frame-metadata = { version = "16.0.0", default-features = false, features = ["current", "std"] }
 bitvec = { version = "1", default-features = false }
 pretty_assertions = "1.4.0"
 anyhow = "1.0.75"
