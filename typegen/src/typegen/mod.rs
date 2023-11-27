@@ -13,11 +13,17 @@ use quote::quote;
 use scale_info::{form::PortableForm, PortableRegistry, Type, TypeDef};
 use syn::parse_quote;
 
+/// Custom error types.
 pub mod error;
+/// Intermediate representation of types and modules.
 pub mod ir;
+/// Utility extension functions on the `TypeGenerator` struct to resolve type paths.
 pub mod resolve_type_paths;
+/// Settings passed into the `TypeGenerator`.
 pub mod settings;
+/// Logic for dealing with used and unused generic type parameters.
 pub mod type_params;
+/// Type path definition and conversion into tokens.
 pub mod type_path;
 
 /// An interface for generating a types module.
@@ -35,10 +41,12 @@ impl<'a> TypeGenerator<'a> {
         }
     }
 
+    /// The name of the generated module which will contain the generated types.
     pub fn types_mod_ident(&self) -> &Ident {
         &self.settings.types_mod_ident
     }
 
+    /// The settings used by this type generator.
     pub fn settings(&self) -> &TypeGeneratorSettings {
         self.settings
     }
@@ -81,6 +89,7 @@ impl<'a> TypeGenerator<'a> {
         Ok(root_mod)
     }
 
+    /// Creates an intermediate representation of a type that can later be converted into rust tokens.
     pub fn create_type_ir(
         &self,
         ty: &Type<PortableForm>,
@@ -156,6 +165,7 @@ impl<'a> TypeGenerator<'a> {
             .unwrap_or_default()
     }
 
+    /// Creates an intermediate representation of a composite.
     pub fn create_composite_ir_kind(
         &self,
         fields: &[scale_info::Field<PortableForm>],
@@ -229,6 +239,8 @@ impl<'a> TypeGenerator<'a> {
         }
     }
 
+    /// Creates the intermediate representation of a type from just a composite definition.
+    /// This uses just the default derives and type params are left empty.
     pub fn upcast_composite(&self, composite: &CompositeIR) -> TypeIR {
         // just use Default Derives + AsCompact. No access to type specific derives here. (Mainly used in subxt to create structs from enum variants...)
         let mut derives = self.settings.derives.default_derives().clone();
@@ -243,6 +255,7 @@ impl<'a> TypeGenerator<'a> {
         }
     }
 
+    /// The default derives set in the type generator's settings.
     pub fn default_derives(&self) -> &Derives {
         self.settings.derives.default_derives()
     }

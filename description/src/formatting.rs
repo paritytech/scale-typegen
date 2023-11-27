@@ -3,6 +3,7 @@ use std::str::Chars;
 use peekmore::{PeekMore, PeekMoreIterator};
 use smallvec::SmallVec;
 
+/// Formats a type description string to have nice indents.
 pub fn format_type_description(input: &str) -> String {
     /// Big scope means we want to spread out items over multiple lines.
     /// Small scope means, we want to keep it compact (on one line).

@@ -20,6 +20,7 @@ pub struct TypeSubstitutes {
     substitutes: HashMap<PathSegments, Substitute>,
 }
 
+/// A type that substitutes another type.
 #[derive(Debug)]
 pub struct Substitute {
     path: syn::Path,
@@ -239,6 +240,7 @@ impl TypeSubstitutes {
     }
 }
 
+/// utility for constructing a `PathSegments` struct.
 #[macro_export]
 macro_rules! path_segments {
     ($($ident: ident)::*) => {
@@ -370,10 +372,12 @@ fn is_absolute(path: &syn::Path) -> bool {
             .map_or(false, |segment| segment.ident == "crate")
 }
 
+/// tries to convert a [`syn::Path`] into an `AbsolutePath`. Only succeeds if the path is not a relative path.
 pub fn absolute_path(path: syn::Path) -> Result<AbsolutePath, TypeSubstitutionError> {
     path.try_into()
 }
 
+/// New-type wrapper around [`syn::Path`]
 pub struct AbsolutePath(syn::Path);
 
 impl TryFrom<syn::Path> for AbsolutePath {

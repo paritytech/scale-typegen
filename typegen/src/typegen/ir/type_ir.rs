@@ -5,17 +5,26 @@ use crate::typegen::{
     settings::derives::Derives, type_params::TypeParameters, type_path::TypePath,
 };
 
+/// Intermediate Representation of a Rust type.
 #[derive(Debug, Clone)]
 pub struct TypeIR {
+    /// Generic type parameters.
     pub type_params: TypeParameters,
+    /// Derived traits for his type.
     pub derives: Derives,
+    /// whether or not `#[codec(...)]` attributes should be inserted.
+    /// Only makes sense if the derives include `Encode`/`Decode`.
     pub insert_codec_attributes: bool,
+    /// Is this type an enum or struct.
     pub kind: TypeIRKind,
 }
 
+/// An enum or struct.
 #[derive(Debug, Clone)]
 pub enum TypeIRKind {
+    /// A struct.
     Struct(CompositeIR),
+    /// An enum.
     Enum(EnumIR),
 }
 
@@ -35,34 +44,46 @@ impl TypeIR {
     }
 }
 
+/// A composite. Could be a struct or a variant of an enum.
 #[derive(Debug, Clone)]
 pub struct CompositeIR {
+    /// Struct name or enum variant name.
     pub name: Ident,
+    /// Named, Unnamed or NoFields.
     pub kind: CompositeIRKind,
+    /// Docs for the composite.
     pub docs: TokenStream,
 }
 
 impl CompositeIR {
+    /// Creates a new `CompositeIR`.
     pub fn new(name: Ident, kind: CompositeIRKind, docs: TokenStream) -> Self {
         Self { name, kind, docs }
     }
 }
 
+/// A rust enum.
 #[derive(Debug, Clone)]
 pub struct EnumIR {
+    /// Docs for the enum.
     pub(crate) docs: TokenStream,
     pub(crate) name: Ident,
     pub(crate) variants: Vec<(u8, CompositeIR)>,
 }
 
+/// Named, Unnamed or NoFields.
 #[derive(Debug, Clone)]
 pub enum CompositeIRKind {
+    /// A zero-sized, empty composite.
     NoFields,
+    /// Composite with named fields, e.g. a struct.
     Named(Vec<(Ident, CompositeFieldIR)>),
+    /// Composite with unnamed fields, e.g. a tuple.
     Unnamed(Vec<CompositeFieldIR>),
 }
 
 impl CompositeIRKind {
+    /// Returns true if this composite be compact encoded. This is only true if the composite has exactly one field which could be compact encoded.
     pub fn could_derive_as_compact(&self) -> bool {
         // has to have only a single field:
         let single_field = match self {
@@ -84,14 +105,20 @@ impl CompositeIRKind {
     }
 }
 
+/// A field of a composite.
 #[derive(Debug, Clone)]
 pub struct CompositeFieldIR {
+    /// type path of the field.
     pub type_path: TypePath,
+    /// Is this field compact encoded?
+    /// Having this as `true` may insert a `#[codec(compact)]` attribute during code generation.
     pub is_compact: bool,
+    /// Is this field actually boxed? e.g. `Box<type_path>` instead of just `type_path`.
     pub is_boxed: bool,
 }
 
 impl CompositeFieldIR {
+    /// Creates a new [`CompositeFieldIR`].
     pub fn new(type_path: TypePath, is_compact: bool, is_boxed: bool) -> Self {
         CompositeFieldIR {
             type_path,
@@ -100,7 +127,8 @@ impl CompositeFieldIR {
         }
     }
 
-    pub fn compact_attr(&self) -> Option<TokenStream> {
+    /// Returns a `#[codec(compact)]` attribute if the field should be compact encoded.
+    fn compact_attr(&self) -> Option<TokenStream> {
         self.is_compact.then(|| quote!( #[codec(compact)] ))
     }
 }

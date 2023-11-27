@@ -68,8 +68,7 @@ impl TypeParameters {
     pub fn has_unused_type_params(&self) -> bool {
         !self.unused.is_empty()
     }
-
-    pub fn mark_used(&mut self, param: &TypeParameter) {
+    pub(super) fn mark_used(&mut self, param: &TypeParameter) {
         self.unused.remove(param);
     }
 }

@@ -5,9 +5,12 @@ use syn::parse_quote;
 
 use self::substitutes::absolute_path;
 
+/// Settings for which derives should be applied on types
 pub mod derives;
+/// Settings for which types should be substituted by other types.
 pub mod substitutes;
 
+/// A struct containing all the settings for generating rust types from a type registry.
 pub struct TypeGeneratorSettings {
     /// The name of the module which will contain the generated types.
     pub types_mod_ident: Ident,
@@ -51,16 +54,19 @@ impl Default for TypeGeneratorSettings {
 }
 
 impl TypeGeneratorSettings {
+    /// Creates a new `TypeGeneratorSettings`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the `type_mod_name` field.
     pub fn type_mod_name(mut self, type_mod_name: &str) -> Self {
         self.types_mod_ident =
             syn::parse_str(type_mod_name).expect("The provided type_mod_name is not a valid ident");
         self
     }
 
+    /// Adds a rule, that a type with path `from` should be replaced with the path `to`.
     pub fn substitute(mut self, from: syn::Path, to: syn::Path) -> Self {
         self.substitutes
             .insert(from, absolute_path(to).unwrap())
@@ -68,31 +74,37 @@ impl TypeGeneratorSettings {
         self
     }
 
+    /// Sets the `compact_as_type_path` field.
     pub fn compact_as_type_path(mut self, path: syn::Path) -> Self {
         self.compact_as_type_path = Some(path);
         self
     }
 
+    /// Sets the `compact_type_path` field.
     pub fn compact_type_path(mut self, path: syn::Path) -> Self {
         self.compact_type_path = Some(path);
         self
     }
 
+    /// Sets the `decoded_bits_type_path` field.
     pub fn decoded_bits_type_path(mut self, path: syn::Path) -> Self {
         self.decoded_bits_type_path = Some(path);
         self
     }
 
+    /// Sets the `should_gen_docs` field.
     pub fn should_gen_docs(mut self, should_gen_docs: bool) -> Self {
         self.should_gen_docs = should_gen_docs;
         self
     }
 
+    /// Sets the `insert_codec_attributes` field.
     pub fn insert_codec_attributes(mut self) -> Self {
         self.insert_codec_attributes = true;
         self
     }
 
+    /// Adds some derives for all types.
     pub fn derive_on_all(mut self, derive_paths: impl IntoIterator<Item = syn::Path>) -> Self {
         self.derives.extend_for_all(derive_paths, []);
         self

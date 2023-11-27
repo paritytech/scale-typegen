@@ -4,12 +4,14 @@ use std::collections::HashMap;
 
 use crate::TypegenError;
 
+/// Converts a [`scale_info::Type`] into a [`syn::TypePath`].
 pub fn syn_type_path(ty: &Type<PortableForm>) -> Result<syn::TypePath, TypegenError> {
     let joined_path = ty.path.segments.join("::");
     let ty_path: syn::TypePath = syn::parse_str(&joined_path)?;
     Ok(ty_path)
 }
 
+/// Deduplicates type paths in the provided Registry.
 pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
     let mut types_with_same_type_path = HashMap::<&[String], SmallVec<[u32; 2]>>::new();
 

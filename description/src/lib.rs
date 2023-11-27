@@ -12,12 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! A crate for turning a type from a [`scale_info::PortableRegistry`] into some other, fully resolved, tree-like representation.
+//! Currently we can generate these representations for a type:
+//! - A human readable description of the type via [`crate::type_description`].
+//! - An exemplary rust value of the type via [`crate::rust_value`].
+//! - An exemplary scale value of the type via [`crate::scale_value`].
+
 #![deny(unused_crate_dependencies)]
+#![deny(missing_docs)]
 
 mod description;
 mod formatting;
 mod transformer;
 
+/// Create type examples for a type registry.
 #[cfg(feature = "type-example")]
 pub mod type_example;
 

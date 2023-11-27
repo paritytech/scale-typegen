@@ -173,6 +173,7 @@ impl<'a> TypeGenerator<'a> {
         Ok(TypePath::from_type(ty))
     }
 
+    /// Converts a [`scale_info::Path`] into a [`TypePathType`], replacing all types that should be substituted.
     pub fn type_path_maybe_with_substitutes(
         &self,
         path: &scale_info::Path<PortableForm>,
@@ -189,6 +190,7 @@ impl<'a> TypeGenerator<'a> {
         }
     }
 
+    /// Resolves a type, given some type id.
     pub fn resolve_type(&self, id: u32) -> Result<&Type<PortableForm>, TypegenError> {
         let ty = self
             .type_registry

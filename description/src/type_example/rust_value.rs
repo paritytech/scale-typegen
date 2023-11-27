@@ -100,6 +100,7 @@ impl<'a> CodeTransformer<'a> {
     }
 }
 
+/// Generates a random rust value for a type from the registry. The result should be a valid rust expression.
 pub fn example(
     type_id: u32,
     types: &PortableRegistry,
@@ -108,6 +109,10 @@ pub fn example(
     example_from_seed(type_id, types, settings_for_path_resolver, 42, None, None)
 }
 
+/// Generates a random rust value for a type from the registry. The result should be a valid rust expression. You can specify a seed to get reproducable results.
+/// The `ty_middleware` can be used, to return a different type when a certain type is encountered.
+/// The `ty_path_middleware` can be used, to convert an type path encountered into a different type path.
+/// E.g. turning `::std::vec::Vec<T>` into just `Vec<T>`.
 pub fn example_from_seed(
     type_id: u32,
     types: &PortableRegistry,

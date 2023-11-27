@@ -11,11 +11,13 @@ use crate::transformer::Transformer;
 
 type ValueTransformer<'a> = Transformer<'a, Value, RefCell<rand_chacha::ChaCha8Rng>>;
 
+/// Generates a random scale value for a type from the registry.
 pub fn example(id: u32, types: &PortableRegistry) -> anyhow::Result<Value> {
     const MAGIC_SEED: u64 = 42;
     example_from_seed(id, types, MAGIC_SEED)
 }
 
+/// Generates a random scale value for a type from the registry. You can specify the seed to get reproducable results.
 pub fn example_from_seed(id: u32, types: &PortableRegistry, seed: u64) -> anyhow::Result<Value> {
     fn error_on_recurse(
         _type_id: u32,

@@ -14,9 +14,12 @@ use syn::parse_quote;
 #[derive(Clone, Debug)]
 pub struct TypePath(TypePathInner);
 
+/// The type path to either a concrete type or a generic type parameter
 #[derive(Clone, Debug)]
 pub enum TypePathInner {
+    /// Generic type parameter
     Parameter(TypeParameter),
+    /// Concrete type
     Type(TypePathType),
 }
 
@@ -55,14 +58,17 @@ impl TypePath {
         }
     }
 
+    /// Returns true, if this is a concrete compact type.
     pub fn is_compact(&self) -> bool {
         matches!(&self.0, TypePathInner::Type(ty) if ty.is_compact())
     }
 
+    /// Returns true, if this is a concrete string type.
     pub fn is_string(&self) -> bool {
         matches!(&self.0, TypePathInner::Type(ty) if ty.is_string())
     }
 
+    /// Returns true, if this is an unsigned integer (anywhere between u8 and u128).
     pub fn is_uint_up_to_u128(&self) -> bool {
         matches!(
             &self.0,
@@ -116,38 +122,60 @@ impl TypePath {
     }
 }
 
+/// The path of a Concrete type
 #[derive(Clone, Debug)]
 pub enum TypePathType {
+    /// A user-defined type (non-builtin struct or enum)
     Path {
+        /// Type path
         path: syn::Path,
+        /// Generic type parameters
         params: Vec<TypePath>,
     },
+    /// A variable sized sequences of elements of some type. See [`std::vec::Vec`].
     Vec {
+        /// Type of elements in the vector.
         of: Box<TypePath>,
     },
+    /// A fixed length array that contains `len` elements of some type.
     Array {
+        /// number of elements in the array
         len: usize,
+        /// Type path
         of: Box<TypePath>,
     },
+    /// A Tuple type
     Tuple {
+        /// Types that make up this tuple
         elements: Vec<TypePath>,
     },
+    /// Primitive type
     Primitive {
+        /// A primitive Rust type.
         def: TypeDefPrimitive,
     },
+    /// A compact encoded type
     Compact {
+        /// The type that is being compact encoded
         inner: Box<TypePath>,
+        /// is this type used as a field of a struct or enum right now?
         is_field: bool,
+        /// path to the `Compact` type (usually [`parity_scale_codec::Compact`])
         compact_type_path: syn::Path,
     },
+    /// A bit vector
     BitVec {
+        /// Order type
         bit_order_type: Box<TypePath>,
+        /// Store type
         bit_store_type: Box<TypePath>,
+        /// A user defined wrapper type around scale_bits::Bits. Should be generic over the `order` and `store` types.
         decoded_bits_type_path: syn::Path,
     },
 }
 
 impl TypePathType {
+    /// Constructs a [`TypePathType`] from some context information.
     pub fn from_type_def_path(
         path: &Path<PortableForm>,
         root_mod_ident: Ident,
@@ -231,10 +259,12 @@ impl TypePathType {
         }
     }
 
+    /// Returns true, if this is a concrete compact type.
     pub fn is_compact(&self) -> bool {
         matches!(self, TypePathType::Compact { .. })
     }
 
+    /// Returns true, if this is a string type.
     pub fn is_string(&self) -> bool {
         matches!(
             self,
@@ -310,6 +340,7 @@ impl TypePathType {
     }
 }
 
+/// A generic type parameter
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TypeParameter {
     pub(super) concrete_type_id: u32,

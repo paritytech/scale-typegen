@@ -1,4 +1,6 @@
+/// Generate an exemplary rust value of some type
 pub mod rust_value;
+/// Generate an exemplary scale value of some type
 pub mod scale_value;
 
 #[cfg(test)]
