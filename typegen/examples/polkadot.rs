@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 
-use frame_metadata;
 use parity_scale_codec::Decode;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
