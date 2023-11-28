@@ -35,9 +35,6 @@ impl<'a, R, S> Transformer<'a, R, S>
 where
     R: Clone + std::fmt::Debug,
 {
-    pub fn state(&self) -> &S {
-        &self.state
-    }
     pub fn new(
         policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
         recurse_policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,

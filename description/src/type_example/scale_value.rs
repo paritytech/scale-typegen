@@ -50,7 +50,7 @@ fn ty_example(
         TypeDef::Variant(variant) => {
             let random_variant = variant
                 .variants
-                .choose(&mut *transformer.state().borrow_mut())
+                .choose(&mut *transformer.state.borrow_mut())
                 .ok_or_else(|| anyhow!("Variant type should have at least one variant"))?;
             let fields = random_variant
                 .fields
@@ -87,12 +87,12 @@ fn ty_example(
         }
         TypeDef::Primitive(primitive) => Ok(primitive_type_def_example(
             primitive,
-            &mut *transformer.state().borrow_mut(),
+            &mut *transformer.state.borrow_mut(),
         )),
         TypeDef::Compact(compact) => transformer.resolve(compact.type_param.id),
         TypeDef::BitSequence(_) => {
             let mut bit_sequence = BitSequence::new();
-            let rng = &mut *transformer.state().borrow_mut();
+            let rng = &mut *transformer.state.borrow_mut();
             for _ in 0..rng.gen_range(3..7) {
                 bit_sequence.push(rng.gen());
             }

@@ -10,21 +10,21 @@ edition = "2021"
 
 [features]
 default = ["type-example"]
-type-example = ["dep:scale-value", "dep:proc-macro2", "dep:rand_chacha", "dep:rand"]
+type-example = ["scale-value", "proc-macro2", "rand_chacha", "rand", "quote", "scale-typegen"]
 
 [dependencies]
 anyhow = { workspace = true }
 peekmore = { workspace = true }
 smallvec = { workspace = true }
 scale-info = { workspace = true }
-scale-typegen = { workspace = true }
-quote = { workspace = true }
 
 #dependencies for "type-example" feature:
 scale-value = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
 rand_chacha = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
+scale-typegen = { workspace = true, optional = true }
+quote = { workspace = true, optional = true }
 
 [dev-dependencies]
 indoc = "2"

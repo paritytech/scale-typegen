@@ -29,14 +29,14 @@ impl<'a> CodeTransformer<'a> {
     /// and, if the correct ty_path_middleware is set, prunes the resulting type path.
     fn resolve_type_path_omit_generics(&self, type_id: u32) -> anyhow::Result<TokenStream> {
         let mut type_path = self
-            .state()
+            .state
             .type_generator
             .resolve_type_path(type_id)
             .map_err(|e| anyhow!("{e}"))?
             .to_token_stream();
 
         // apply ty path middleware pruning/replacing paths:
-        if let Some(ty_path_middleware) = &self.state().ty_path_middleware {
+        if let Some(ty_path_middleware) = &self.state.ty_path_middleware {
             type_path = ty_path_middleware(type_path);
         };
 
