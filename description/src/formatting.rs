@@ -13,7 +13,7 @@ pub fn format_type_description(input: &str) -> String {
         Small,
     }
 
-    const SMALL_SCOPE_MAX_TOKENS: usize = 30;
+    const SMALL_SCOPE_MAX_TOKENS: usize = 32;
     /// should be called on the chars iterator shortly after open_token was encountered.
     fn scope_is_small(
         chars: &mut PeekMoreIterator<Chars>,

@@ -19,6 +19,8 @@ pub fn type_description(
         ty: &Type<PortableForm>,
         _transformer: &Transformer<String>,
     ) -> anyhow::Result<String> {
+        dbg!(_type_id);
+        dbg!(ty);
         if let Some(type_name) = ty.path.ident() {
             return Ok(type_name);
         }
@@ -35,7 +37,6 @@ pub fn type_description(
     if format {
         description = format_type_description(&description);
     }
-
     Ok(description)
 }
 

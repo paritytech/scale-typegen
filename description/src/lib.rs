@@ -21,6 +21,10 @@
 #![deny(unused_crate_dependencies)]
 #![deny(missing_docs)]
 
+// Because of `unused_crate_dependencies` flag:
+#[cfg(test)]
+use parity_scale_codec as _;
+
 mod description;
 mod formatting;
 mod transformer;
@@ -77,61 +81,80 @@ mod tests {
             }"}
         );
     }
-    // todo!("This test with the generics does not fly yet.")
-    // #[test]
-    // fn enums() {
-    //     #[allow(unused)]
-    //     #[derive(TypeInfo)]
-    //     enum Shape<T> {
-    //         Inivisible,
-    //         Circle(u64),
-    //         Rect(Compact<u64>, Compact<u64>),
-    //         Polygon {
-    //             corners: u8,
-    //             radius: u64,
-    //         },
-    //         MultiShape {
-    //             shapes: Vec<Shape<u32>>,
-    //             t: T,
-    //             operation: Operation,
-    //         },
-    //     }
 
-    //     #[allow(unused)]
-    //     #[derive(TypeInfo)]
-    //     enum Operation {
-    //         Add,
-    //         Intersect,
-    //         Difference,
-    //     }
+    #[test]
+    fn enums() {
+        use parity_scale_codec::Compact;
 
-    //     let (type_id, type_registry) = make_type::<Shape<bool>>();
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        enum Shape<T> {
+            Inivisible,
+            Circle(u64),
+            Rect(Compact<u64>, Compact<u64>),
+            Polygon {
+                corners: u8,
+                radius: u64,
+            },
+            MultiShape {
+                shapes: Vec<Shape<u64>>,
+                t: T,
+                operation: Operation,
+            },
+        }
 
-    //     assert_eq!(
-    //         type_description(type_id, &type_registry).unwrap(),
-    //         indoc! {
-    //         "enum Shape {
-    //             Inivisible,
-    //             Circle(u64),
-    //             Rect(
-    //                 Compact<u64>,
-    //                 Compact<u64>
-    //             ),
-    //             Polygon  {
-    //                 corners: u8,
-    //                 radius: u64
-    //             },
-    //             MultiShape  {
-    //                 shapes: Vec<Shape>,
-    //                 operation: enum Operation {
-    //                     Add,
-    //                     Intersect,
-    //                     Difference
-    //                 }
-    //             }
-    //         }"}
-    //     );
-    // }
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        enum Operation {
+            Add,
+            Intersect,
+            Difference,
+        }
+
+        let (type_id, type_registry) = make_type::<Shape<u8>>();
+        dbg!(&type_registry);
+        assert_eq!(
+            type_description(type_id, &type_registry, true).unwrap(),
+            indoc! {
+            "enum Shape {
+                Inivisible,
+                Circle(u64),
+                Rect(Compact<u64>, Compact<u64>),
+                Polygon  {
+                    corners: u8,
+                    radius: u64
+                },
+                MultiShape  {
+                    shapes: Vec<
+                        enum Shape {
+                            Inivisible,
+                            Circle(u64),
+                            Rect(Compact<u64>, Compact<u64>),
+                            Polygon  {
+                                corners: u8,
+                                radius: u64
+                            },
+                            MultiShape  {
+                                shapes: Vec<Shape>,
+                                t: u64,
+                                operation: enum Operation {
+                                    Add,
+                                    Intersect,
+                                    Difference
+                                }
+                            }
+                        }
+                    >,
+                    t: u8,
+                    operation: enum Operation {
+                        Add,
+                        Intersect,
+                        Difference
+                    }
+                }
+            }"}
+        );
+    }
 
     #[test]
     fn recursive_structs() {
@@ -162,6 +185,35 @@ mod tests {
                 home: House {
                     inhabitants: Vec<Human>
                 }
+            }"}
+        );
+    }
+
+    #[test]
+    fn recursive_containers() {
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct Container {
+            shapes: Vec<S>,
+        }
+
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct S {
+            u: u8,
+            others: Vec<S>,
+        }
+
+        let (type_id, type_registry) = make_type::<Container>();
+
+        assert_eq!(
+            type_description(type_id, &type_registry, true).unwrap(),
+            indoc! {
+            "Container {
+                shapes: Vec<S {
+                    u: u8,
+                    others: Vec<S>
+                }>
             }"}
         );
     }

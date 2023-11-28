@@ -422,6 +422,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "indoc",
+ "parity-scale-codec",
  "peekmore",
  "pretty_assertions",
  "proc-macro2",
