@@ -27,6 +27,7 @@ pub mod type_params;
 pub mod type_path;
 
 /// An interface for generating a types module.
+#[derive(Debug, Clone, Copy)]
 pub struct TypeGenerator<'a> {
     type_registry: &'a PortableRegistry,
     settings: &'a TypeGeneratorSettings,

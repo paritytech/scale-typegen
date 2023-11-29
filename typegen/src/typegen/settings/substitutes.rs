@@ -15,19 +15,19 @@ fn error(span: Span, kind: TypeSubstitutionErrorKind) -> TypeSubstitutionError {
 
 /// A map of type substitutes. We match on the paths to generated types in order
 /// to figure out when to swap said type with some provided substitute.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypeSubstitutes {
     substitutes: HashMap<PathSegments, Substitute>,
 }
 
 /// A type that substitutes another type.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Substitute {
     path: syn::Path,
     param_mapping: TypeParamMapping,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum TypeParamMapping {
     // Pass any generics from source to target type
     PassThrough,
@@ -254,7 +254,7 @@ macro_rules! path_segments {
 ///
 /// We use this as a common denominator, since we need a consistent keys for both
 /// `syn::TypePath` and `scale_info::ty::path::Path` types.
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct PathSegments(pub Vec<String>);
 
 impl From<&syn::Path> for PathSegments {

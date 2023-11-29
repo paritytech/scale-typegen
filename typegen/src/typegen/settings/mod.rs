@@ -11,6 +11,7 @@ pub mod derives;
 pub mod substitutes;
 
 /// A struct containing all the settings for generating rust types from a type registry.
+#[derive(Debug, Clone)]
 pub struct TypeGeneratorSettings {
     /// The name of the module which will contain the generated types.
     pub types_mod_ident: Ident,
