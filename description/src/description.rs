@@ -8,7 +8,12 @@ use crate::transformer::Transformer;
 
 use super::formatting::format_type_description;
 
-/// if format is enabled, `format_type_description` is applied to the end result.
+/// Describes the type that is registered under the given `type_id`. This type description
+/// is supposed to be very close to actual rust types, with some minar differences:
+/// - The `struct` keyword is omitted. So the description of `struct Human { age: u8 }` is just `Human { age: u8 }`.
+/// - Types are presented in a nested fashion, similar to how structures can be defined in e.g. the C programming language.
+///
+/// If the `format` flag is enabled, the end result is formatted across multiple lines. Otherwise the description will be one single line string.
 pub fn type_description(
     type_id: u32,
     type_registry: &PortableRegistry,
@@ -19,8 +24,6 @@ pub fn type_description(
         ty: &Type<PortableForm>,
         _transformer: &Transformer<String>,
     ) -> anyhow::Result<String> {
-        dbg!(_type_id);
-        dbg!(ty);
         if let Some(type_name) = ty.path.ident() {
             return Ok(type_name);
         }

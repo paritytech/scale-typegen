@@ -113,7 +113,6 @@ mod tests {
         }
 
         let (type_id, type_registry) = make_type::<Shape<u8>>();
-        dbg!(&type_registry);
         assert_eq!(
             type_description(type_id, &type_registry, true).unwrap(),
             indoc! {

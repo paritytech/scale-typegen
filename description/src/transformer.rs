@@ -58,8 +58,7 @@ where
 
         match self.cache.borrow().get(&type_id) {
             Some(Cached::Recursive) => {
-                dbg!(self.cache.borrow());
-                if !recursion_should_fall_through(&ty.type_def) {
+                if !recursion_should_continue(&ty.type_def) {
                     return (self.recurse_policy)(type_id, ty, self);
                 }
             }
@@ -76,6 +75,7 @@ where
     }
 }
 
+/// Returns true for types where recursion should continue, instead of being stopped when recursion in being detected.
 ///
 /// ## Background:
 ///
@@ -104,9 +104,11 @@ where
 /// This is because Vec<B> needs to be mapped to different strings, so the simple cache lookup is not viable.
 /// The solution to this is, to just let some container types like Vec do recursion while others can't.
 ///
+/// # Warning
+///
 /// The safety of the following logic relies on the assumption that ultimately everything resolves down to a primitive or a struct/enum that is in the cache.
-/// It basically just returns true o generic wrapper types.
-fn recursion_should_fall_through(def: &TypeDef<PortableForm>) -> bool {
+/// It basically just returns true for generic wrapper types.
+fn recursion_should_continue(def: &TypeDef<PortableForm>) -> bool {
     match def {
         scale_info::TypeDef::Sequence(_) => true,
         scale_info::TypeDef::Array(_) => true,
