@@ -104,7 +104,7 @@ impl<'a> CodeTransformer<'a> {
 pub fn example(
     type_id: u32,
     types: &PortableRegistry,
-    settings_for_path_resolver: TypeGeneratorSettings,
+    settings_for_path_resolver: &TypeGeneratorSettings,
 ) -> anyhow::Result<TokenStream> {
     example_from_seed(type_id, types, settings_for_path_resolver, 42, None, None)
 }
@@ -116,7 +116,7 @@ pub fn example(
 pub fn example_from_seed(
     type_id: u32,
     types: &PortableRegistry,
-    settings_for_path_resolver: TypeGeneratorSettings,
+    settings_for_path_resolver: &TypeGeneratorSettings,
     seed: u64,
     ty_middleware: Option<TyMiddleware>,
     ty_path_middleware: Option<TyPathMiddleware>,
@@ -133,7 +133,7 @@ pub fn example_from_seed(
 
     let state = CodeTransformerState {
         rng: RefCell::new(rand_chacha::ChaCha8Rng::seed_from_u64(seed)),
-        type_generator: TypeGenerator::new(types, &settings_for_path_resolver),
+        type_generator: TypeGenerator::new(types, settings_for_path_resolver),
         ty_middleware,
         ty_path_middleware,
     };
@@ -184,13 +184,13 @@ fn ty_example(
         scale_info::TypeDef::Sequence(def) => {
             // return a Vec with 2 elements:
             let inner_ty = transformer.resolve_type(def.type_param.id)?;
-            let item_code = ty_example(def.type_param.id, inner_ty, transformer)?; // todo!("Might need CompactMode::Expl")
+            let item_code = ty_example(def.type_param.id, inner_ty, transformer)?;
             let vec_code = quote!(vec![#item_code, #item_code, #item_code]);
             Ok(vec_code)
         }
         scale_info::TypeDef::Array(def) => {
             let inner_ty = transformer.resolve_type(def.type_param.id)?;
-            let item_code = ty_example(def.type_param.id, inner_ty, transformer)?; //todo!("Might need CompactMode::Expl")
+            let item_code = ty_example(def.type_param.id, inner_ty, transformer)?;
             let inner_is_copy = transformer.type_def_is_copy(&inner_ty.type_def)?;
             let len = def.len as usize;
             let arr_code = if inner_is_copy {
@@ -206,7 +206,7 @@ fn ty_example(
         scale_info::TypeDef::Tuple(def) => {
             let mut fields: Vec<TokenStream> = vec![];
             for f in &def.fields {
-                let value = transformer.resolve(f.id)?; //todo!("Might need CompactMode::Expl")
+                let value = transformer.resolve(f.id)?;
                 fields.push(value)
             }
             Ok(quote!(( #(#fields),* )))
@@ -216,29 +216,7 @@ fn ty_example(
             &mut *transformer.state.rng.borrow_mut(),
         )),
         scale_info::TypeDef::Compact(def) => {
-            // there are actually two possibilities here:
-            // 1. the value is not actually compact but just tagged with { #[codec(compact)] number: u8 } in the type definition.
-            // --> give a normal primitive as a type example, e.g. 8
-            // 2. the value is actually like (Compact<u8>, String) in the type definition.
-            // --> give compact type example, e.g. Compact(8)
-
-            // How to find out? In structs, we are gonna be in case 1, otherwise (inside a tuple, array or vec) where the #[codec(compact)] is not possible, we are in case 2.
-            // `explicit_compact` flag is used to indicate we are in case 2.
-
-            let inner_code = transformer.resolve(def.type_param.id)?; //todo!("Might need CompactMode::Expl")
-
-            // I used this originally, but it turns out the compact part should be omitted:
-
-            // todo!("Revisit this code and figure out a better way to handle compact types")
-            // let code = match compact_mode {
-            //     CompactMode::Expl => {
-            //         let compact_path = resolve_type_path_omit_generics(type_gen, id);
-            //         quote!(#compact_path(#inner_code))
-            //     }
-            //     CompactMode::Attr => inner_code,
-            // };
-            let code = inner_code;
-
+            let code = transformer.resolve(def.type_param.id)?;
             Ok(code)
         }
         scale_info::TypeDef::BitSequence(_def) => {
@@ -256,6 +234,15 @@ fn fields_example(
 ) -> anyhow::Result<TokenStream> {
     let all_named = fields.iter().all(|f| f.name.is_some());
     let all_unnamed = fields.iter().all(|f| f.name.is_none());
+
+    /// Field does not only have a `codec(compact)` attirbute but is actually Compact<T>.
+    fn field_is_explicit_compact(f: &Field<PortableForm>) -> bool {
+        f.type_name
+            .as_ref()
+            .map(|e| e.starts_with("Compact<"))
+            .unwrap_or(false)
+    }
+
     match (all_named, all_unnamed) {
         (true, false) => {
             // all fields named
@@ -263,7 +250,10 @@ fn fields_example(
             for f in fields {
                 let name = f.name.as_ref().expect("safe because of check above; qed");
                 let ident = format_ident!("{name}");
-                let value_code = transformer.resolve(f.ty.id)?; // todo!("Check if Compact attribute needed")
+                let mut value_code = transformer.resolve(f.ty.id)?;
+                if field_is_explicit_compact(f) {
+                    value_code = quote!(Compact(#value_code))
+                }
                 field_idents_and_values.push(quote!(#ident : #value_code));
             }
             // maybe add phantom data to struct / named composite enum
@@ -278,7 +268,10 @@ fn fields_example(
             // all fields unnamed
             let mut field_values: Vec<TokenStream> = vec![];
             for f in fields {
-                let value_code = transformer.resolve(f.ty.id)?; // todo!("Check if Compact attribute needed")
+                let mut value_code = transformer.resolve(f.ty.id)?;
+                if field_is_explicit_compact(f) {
+                    value_code = quote!(Compact(#value_code))
+                }
                 field_values.push(value_code);
             }
             // maybe add phantom data to struct / named composite enum

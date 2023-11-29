@@ -48,10 +48,13 @@ mod tests {
     // Note: indoc is used to make it easier to represent multi-line strings.
     use indoc::indoc;
 
+    use parity_scale_codec::Compact;
     use pretty_assertions::assert_eq;
+    use proc_macro2::TokenStream;
     use scale_info::{PortableRegistry, TypeInfo};
+    use scale_typegen::TypeGeneratorSettings;
 
-    use crate::type_description;
+    use crate::{type_description, type_example::rust_value};
 
     fn make_type<T: TypeInfo + 'static>() -> (u32, PortableRegistry) {
         let mut registry = scale_info::Registry::new();
@@ -215,6 +218,57 @@ mod tests {
                     others: Vec<S>
                 }>
             }"}
+        );
+    }
+
+    #[test]
+    fn rust_value_compact() {
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct S0 {
+            #[codec(compact)]
+            n: u8,
+        }
+
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct S1 {
+            n: Compact<u8>,
+        }
+
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct T0(#[codec(compact)] u8);
+
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct T1(Compact<u8>);
+
+        use quote::quote;
+        use syn::parse_quote;
+
+        fn get_example<T: TypeInfo + 'static>() -> TokenStream {
+            let (type_id, type_registry) = make_type::<T>();
+            let settings = TypeGeneratorSettings::new().compact_type_path(parse_quote!(Compact));
+            rust_value::example(type_id, &type_registry, &settings).unwrap()
+        }
+
+        // Note: The 161 is pretty random and depends on the default seed of the RNG.
+        assert_eq!(
+            get_example::<S0>().to_string(),
+            quote! {types::scale_typegen_description::tests::S0{ n: 161u8, }}.to_string()
+        );
+        assert_eq!(
+            get_example::<S1>().to_string(),
+            quote! {types::scale_typegen_description::tests::S1{ n: Compact(161u8), }}.to_string()
+        );
+        assert_eq!(
+            get_example::<T0>().to_string(),
+            quote! {types::scale_typegen_description::tests::T0( 161u8, )}.to_string()
+        );
+        assert_eq!(
+            get_example::<T1>().to_string(),
+            quote! {types::scale_typegen_description::tests::T1( Compact(161u8), )}.to_string()
         );
     }
 }

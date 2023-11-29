@@ -30,3 +30,4 @@ quote = { workspace = true, optional = true }
 indoc = "2"
 pretty_assertions = { workspace = true }
 parity-scale-codec = { workspace = true }
+syn = { workspace = true }

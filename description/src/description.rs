@@ -49,17 +49,13 @@ fn ty_description(
     transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
     let ident = ty.path.ident().unwrap_or_default();
-    let prefix = type_def_prefix(&ty.type_def);
+    let prefix = if let TypeDef::Variant(_) = ty.type_def {
+        "enum "
+    } else {
+        ""
+    };
     let type_def_description = type_def_type_description(&ty.type_def, transformer)?;
     Ok(format!("{prefix}{ident}{type_def_description}"))
-}
-
-/// todo: clean this up
-fn type_def_prefix(type_def: &TypeDef<PortableForm>) -> &str {
-    match type_def {
-        TypeDef::Variant(_) => "enum ",
-        _ => "",
-    }
 }
 
 fn type_def_type_description(
