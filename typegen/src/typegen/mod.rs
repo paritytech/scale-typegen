@@ -52,6 +52,11 @@ impl<'a> TypeGenerator<'a> {
         self.settings
     }
 
+    /// The type registry backing this type generator.
+    pub fn types(&self) -> &PortableRegistry {
+        self.type_registry
+    }
+
     /// Generate a module containing all types defined in the supplied type registry.
     pub fn generate_types_mod(&self) -> Result<ModuleIR, TypegenError> {
         let flat_derives_registry = self
