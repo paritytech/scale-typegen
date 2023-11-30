@@ -28,6 +28,8 @@ use parity_scale_codec as _;
 mod description;
 mod formatting;
 mod transformer;
+
+#[cfg(feature = "type-example")]
 pub use scale_typegen;
 
 /// Create type examples for a type registry.
