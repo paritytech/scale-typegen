@@ -14,11 +14,9 @@ pub struct Transformer<'a, R, S = ()> {
     pub state: S,
     /// The `policy` defines, how to transform a type. If the type is unrepresentable, return an Err.
     policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
-    /// The `recurse_policy` defines, how to handle cases,
-    /// where a type has been visited before, and is visited again BEFORE a representation of this type could be computed.
-    /// If it returns Some(..) we avoid infinite recursion by returning a concrete value.
-    /// If it returns None, nothing is done in the case of detected recursion and the type falls through.
-    /// It is transformed with the `policy` in this case. This can be dangerous, but may be necessary for some container types.
+    /// The `recurse_policy` defines, how to handle cases, where a type has been
+    /// visited before, and is visited *again*, before a representation of this type could be computed.
+    /// It is up the implementation to return an error in these cases, or some other value.
     recurse_policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
     registry: &'a PortableRegistry,
 }
