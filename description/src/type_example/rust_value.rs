@@ -7,9 +7,12 @@ use scale_info::{form::PortableForm, Field, PortableRegistry, Type, TypeDef, Typ
 use scale_typegen::{TypeGenerator, TypeGeneratorSettings};
 use std::cell::RefCell;
 
-type CodeTransformer<'a> = Transformer<'a, TokenStream, CodeTransformerState<'a>>;
+/// A transformer capable of converting a [`scale_info::Type`] from a type registry into
+/// a rust expression.
+pub type CodeTransformer<'a> = Transformer<'a, TokenStream, CodeTransformerState<'a>>;
 
-struct CodeTransformerState<'a> {
+/// Inner state of a `CodeTransformer`
+pub struct CodeTransformerState<'a> {
     rng: RefCell<rand_chacha::ChaCha8Rng>,
     type_generator: TypeGenerator<'a>,
     /// `ty_middleware` allows you to return a different value on a case by case basis.
@@ -20,9 +23,12 @@ struct CodeTransformerState<'a> {
     ty_path_middleware: Option<TyPathMiddleware>,
 }
 
-type TyMiddleware = Box<dyn Fn(&Type<PortableForm>) -> Option<anyhow::Result<TokenStream>>>;
+///  Middleware for a `CodeTransformer` to return a different type when a certain type is encountered.
+pub type TyMiddleware =
+    Box<dyn Fn(&Type<PortableForm>, &CodeTransformer) -> Option<anyhow::Result<TokenStream>>>;
 
-type TyPathMiddleware = Box<dyn Fn(TokenStream) -> TokenStream>;
+/// Middleware for a `CodeTransformer` to convert a type path encountered into a different type path.
+pub type TyPathMiddleware = Box<dyn Fn(TokenStream) -> TokenStream>;
 
 impl<'a> CodeTransformer<'a> {
     /// resolves a type path, removes the generic bits, e.g. `Foo<T, R>` becomes `Foo`,
@@ -149,7 +155,7 @@ fn ty_example(
 ) -> anyhow::Result<TokenStream> {
     // if middleware wants to intersect and return something else, it can:
     if let Some(middleware) = &transformer.state.ty_middleware {
-        if let Some(intersected) = middleware(ty) {
+        if let Some(intersected) = middleware(ty, transformer) {
             return intersected;
         }
     }
