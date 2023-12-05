@@ -80,7 +80,7 @@ mod tests {
         assert_eq!(
             type_description(type_id, &type_registry, true).unwrap(),
             indoc! {
-            "Human {
+            "struct Human {
                 name: String,
                 age: u32,
                 male: bool
@@ -125,21 +125,21 @@ mod tests {
                 Inivisible,
                 Circle(u64),
                 Rect(Compact<u64>, Compact<u64>),
-                Polygon  {
+                Polygon {
                     corners: u8,
                     radius: u64
                 },
-                MultiShape  {
+                MultiShape {
                     shapes: Vec<
                         enum Shape {
                             Inivisible,
                             Circle(u64),
                             Rect(Compact<u64>, Compact<u64>),
-                            Polygon  {
+                            Polygon {
                                 corners: u8,
                                 radius: u64
                             },
-                            MultiShape  {
+                            MultiShape {
                                 shapes: Vec<Shape>,
                                 t: u64,
                                 operation: enum Operation {
@@ -183,11 +183,11 @@ mod tests {
         assert_eq!(
             type_description(type_id, &type_registry, true).unwrap(),
             indoc! {
-            "Human {
+            "struct Human {
                 name: String,
                 friends: Vec<Human>,
                 dad: Box<Human>,
-                home: House {
+                home: struct House {
                     inhabitants: Vec<Human>
                 }
             }"}
@@ -214,8 +214,8 @@ mod tests {
         assert_eq!(
             type_description(type_id, &type_registry, true).unwrap(),
             indoc! {
-            "Container {
-                shapes: Vec<S {
+            "struct Container {
+                shapes: Vec<struct S {
                     u: u8,
                     others: Vec<S>
                 }>

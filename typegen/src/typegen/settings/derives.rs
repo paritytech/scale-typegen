@@ -55,6 +55,82 @@ impl DerivesRegistry {
     pub fn default_derives(&self) -> &Derives {
         &self.default_derives
     }
+
+    /// Flattens out the recursive derives into specific derives.
+    /// For this it needs to have a PortableRegistry that it can traverse recursively.
+    pub fn flatten_recursive_derives(
+        self,
+        types: &PortableRegistry,
+    ) -> Result<FlatDerivesRegistry, TypegenError> {
+        let DerivesRegistry {
+            default_derives,
+            mut specific_type_derives,
+            mut recursive_type_derives,
+        } = self;
+
+        if recursive_type_derives.is_empty() {
+            return Ok(FlatDerivesRegistry {
+                default_derives,
+                specific_type_derives,
+            });
+        }
+
+        // Build a mapping of type ids to syn paths for all types in the registry:
+        let mut syn_path_for_id: HashMap<u32, syn::TypePath> = types
+            .types
+            .iter()
+            .filter_map(|t| {
+                if t.ty.path.is_empty() {
+                    None
+                } else {
+                    match syn_type_path(&t.ty) {
+                        Ok(path) => Some(Ok((t.id, path))),
+                        Err(err) => Some(Err(err)),
+                    }
+                }
+            })
+            .collect::<Result<_, TypegenError>>()?;
+
+        // Create an empty map of derives that we are about to fill:
+        let mut add_derives_for_id: HashMap<u32, Derives> = HashMap::new();
+
+        // Check for each type in the registry if it is the top level of
+        for ty in types.types.iter() {
+            let Some(path) = syn_path_for_id.get(&ty.id) else {
+                // this is only the case for types with empty path (i.e. builtin types).
+                continue;
+            };
+            let Some(recursive_derives) = recursive_type_derives.remove(path) else {
+                continue;
+            };
+            // The collected_type_ids contain the id of the type itself and all ids of its fields:
+            let mut collected_type_ids: HashSet<u32> = HashSet::new();
+            collect_type_ids(ty.id, types, &mut collected_type_ids);
+
+            // We collect the derives for each type id in the add_derives_for_id HashMap.
+            for id in collected_type_ids {
+                add_derives_for_id
+                    .entry(id)
+                    .or_default()
+                    .extend_from(recursive_derives.clone());
+            }
+        }
+
+        // Merge all the recursively obtained derives with the existing derives for the types.
+        for (id, derived_to_add) in add_derives_for_id {
+            if let Some(path) = syn_path_for_id.remove(&id) {
+                specific_type_derives
+                    .entry(path)
+                    .or_default()
+                    .extend_from(derived_to_add);
+            }
+        }
+
+        Ok(FlatDerivesRegistry {
+            default_derives,
+            specific_type_derives,
+        })
+    }
 }
 
 /// A struct storing the set of derives and derive attributes that we'll apply
@@ -162,84 +238,6 @@ impl FlatDerivesRegistry {
         ty: &Type<PortableForm>,
     ) -> Result<Derives, TypegenError> {
         Ok(self.resolve(&syn_type_path(ty)?))
-    }
-}
-
-impl DerivesRegistry {
-    /// Flattens out the recursive derives into specific derives.
-    /// For this it needs to have a PortableRegistry that it can traverse recursively.
-    pub fn flatten_recursive_derives(
-        self,
-        types: &PortableRegistry,
-    ) -> Result<FlatDerivesRegistry, TypegenError> {
-        let DerivesRegistry {
-            default_derives,
-            mut specific_type_derives,
-            mut recursive_type_derives,
-        } = self;
-
-        if recursive_type_derives.is_empty() {
-            return Ok(FlatDerivesRegistry {
-                default_derives,
-                specific_type_derives,
-            });
-        }
-
-        // Build a mapping of type ids to syn paths for all types in the registry:
-        let mut syn_path_for_id: HashMap<u32, syn::TypePath> = types
-            .types
-            .iter()
-            .filter_map(|t| {
-                if t.ty.path.is_empty() {
-                    None
-                } else {
-                    match syn_type_path(&t.ty) {
-                        Ok(path) => Some(Ok((t.id, path))),
-                        Err(err) => Some(Err(err)),
-                    }
-                }
-            })
-            .collect::<Result<_, TypegenError>>()?;
-
-        // Create an empty map of derives that we are about to fill:
-        let mut add_derives_for_id: HashMap<u32, Derives> = HashMap::new();
-
-        // Check for each type in the registry if it is the top level of
-        for ty in types.types.iter() {
-            let Some(path) = syn_path_for_id.get(&ty.id) else {
-                // this is only the case for types with empty path (i.e. builtin types).
-                continue;
-            };
-            let Some(recursive_derives) = recursive_type_derives.remove(path) else {
-                continue;
-            };
-            // The collected_type_ids contain the id of the type itself and all ids of its fields:
-            let mut collected_type_ids: HashSet<u32> = HashSet::new();
-            collect_type_ids(ty.id, types, &mut collected_type_ids);
-
-            // We collect the derives for each type id in the add_derives_for_id HashMap.
-            for id in collected_type_ids {
-                add_derives_for_id
-                    .entry(id)
-                    .or_default()
-                    .extend_from(recursive_derives.clone());
-            }
-        }
-
-        // Merge all the recursively obtained derives with the existing derives for the types.
-        for (id, derived_to_add) in add_derives_for_id {
-            if let Some(path) = syn_path_for_id.remove(&id) {
-                specific_type_derives
-                    .entry(path)
-                    .or_default()
-                    .extend_from(derived_to_add);
-            }
-        }
-
-        Ok(FlatDerivesRegistry {
-            default_derives,
-            specific_type_derives,
-        })
     }
 }
 

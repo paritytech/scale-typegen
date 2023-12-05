@@ -49,10 +49,10 @@ fn ty_description(
     transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
     let ident = ty.path.ident().unwrap_or_default();
-    let prefix = if let TypeDef::Variant(_) = ty.type_def {
-        "enum "
-    } else {
-        ""
+    let prefix = match &ty.type_def {
+        TypeDef::Variant(_) => "enum ",
+        TypeDef::Composite(_) => "struct ",
+        _ => "",
     };
     let type_def_description = type_def_type_description(&ty.type_def, transformer)?;
     Ok(format!("{prefix}{ident}{type_def_description}"))
@@ -175,10 +175,8 @@ fn variant_type_description(
     let fields_string = fields_type_description(&variant.fields, transformer)?;
     let output = if fields_string == "()" {
         variant.name.to_string()
-    } else if fields_string.starts_with('(') {
-        format!("{}{}", &variant.name, fields_string)
     } else {
-        format!("{} {}", &variant.name, fields_string)
+        format!("{}{}", &variant.name, fields_string)
     };
     Ok(output)
 }
