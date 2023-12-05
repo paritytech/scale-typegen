@@ -18,13 +18,6 @@
 //! - An exemplary rust value of the type via [`crate::rust_value`].
 //! - An exemplary scale value of the type via [`crate::scale_value`].
 
-#![deny(unused_crate_dependencies)]
-#![deny(missing_docs)]
-
-// Because of `unused_crate_dependencies` flag:
-#[cfg(test)]
-use parity_scale_codec as _;
-
 mod description;
 mod formatting;
 mod transformer;
