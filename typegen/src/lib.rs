@@ -13,16 +13,7 @@
 // limitations under the License.
 
 //! A library based on [scale-info](https://github.com/paritytech/scale-info) to transpile portable registries of types into rust type definitions.
-#![deny(unused_crate_dependencies)]
 #![deny(missing_docs)]
-
-// The #![deny(unused_crate_dependencies)] requires us to do these for the example to work:
-#[cfg(test)]
-use frame_metadata as _;
-#[cfg(test)]
-use prettyplease as _;
-#[cfg(test)]
-use scale_bits as _;
 
 /// Type Generation Settings and Logic
 pub mod typegen;
