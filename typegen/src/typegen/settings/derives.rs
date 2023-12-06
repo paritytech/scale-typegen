@@ -131,6 +131,15 @@ impl DerivesRegistry {
             specific_type_derives,
         })
     }
+
+    /// An iterator over (syn::TypePath, Derives) pairs for specific types (also recursive ones).
+    pub fn derives_on_specific_types<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = (&'a syn::TypePath, &'a Derives)> {
+        self.specific_type_derives
+            .iter()
+            .chain(self.recursive_type_derives.iter())
+    }
 }
 
 /// A struct storing the set of derives and derive attributes that we'll apply
@@ -181,6 +190,16 @@ impl Derives {
     /// Insert a single attribute to be applied to types.
     pub fn insert_attribute(&mut self, attribute: syn::Attribute) {
         self.attributes.insert(attribute);
+    }
+
+    /// Getter for the derived traits
+    pub fn derives(&self) -> &HashSet<syn::Path> {
+        &self.derives
+    }
+
+    /// Getter for the added attributes
+    pub fn attributes(&self) -> &HashSet<syn::Attribute> {
+        &self.attributes
     }
 }
 

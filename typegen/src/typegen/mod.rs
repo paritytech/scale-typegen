@@ -25,6 +25,9 @@ pub mod settings;
 pub mod type_params;
 /// Type path definition and conversion into tokens.
 pub mod type_path;
+/// Utility extension functions on the `TypeGenerator` struct to validate
+/// that the settings match up with the given metadata.
+pub mod validate_settings;
 
 /// An interface for generating a types module.
 #[derive(Debug, Clone, Copy)]

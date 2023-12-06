@@ -7,9 +7,9 @@ use syn::parse_quote;
 
 use crate::{
     tests::utils::{subxt_settings, Testgen},
-    typegen::settings::TypeGeneratorSettings,
+    typegen::{error::SettingsValidationError, settings::TypeGeneratorSettings},
     utils::ensure_unique_type_paths,
-    DerivesRegistry, TypeSubstitutes,
+    DerivesRegistry, TypeGenerator, TypeSubstitutes,
 };
 
 mod utils;
@@ -1239,4 +1239,59 @@ fn ensure_unique_type_paths_test() {
             "scale_typegen::tests::Header3",
         ]
     );
+}
+
+#[test]
+fn validation_errors() {
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct S;
+
+    let registry = Testgen::new().with::<S>().into_portable_registry();
+    let mut settings = TypeGeneratorSettings::new();
+    settings.derives = {
+        let mut d = DerivesRegistry::new();
+        d.extend_for_type(
+            parse_quote!(scale_typegen::tests::S),
+            [parse_quote!(Clone), parse_quote!(Reflect)],
+            [parse_quote!(#[nice])],
+            true,
+        );
+        d.extend_for_type(
+            parse_quote!(scale_typegen::tests::T),
+            [parse_quote!(Clone), parse_quote!(Reflect)],
+            [parse_quote!(#[nice])],
+            true,
+        );
+        d
+    };
+    settings = settings
+        .substitute(
+            parse_quote!(scale_typegen::tests::S),
+            parse_quote!(::hello::S),
+        )
+        .substitute(
+            parse_quote!(scale_typegen::tests::T),
+            parse_quote!(::hello::T),
+        );
+
+    let type_gen = TypeGenerator::new(&registry, &settings);
+    let err = type_gen.validate().unwrap_err();
+    // we expect only errors for type T because S is in the registry, T is not.
+    let expected_err = SettingsValidationError {
+        derives_for_unknown_types: vec![(
+            parse_quote!(scale_typegen::tests::T),
+            [parse_quote!(Clone), parse_quote!(Reflect)].into(),
+        )],
+        attributes_for_unknown_types: vec![(
+            parse_quote!(scale_typegen::tests::T),
+            [parse_quote!(#[nice])].into(),
+        )],
+        substitutes_for_unknown_types: vec![(
+            parse_quote!(scale_typegen::tests::T),
+            parse_quote!(::hello::T),
+        )],
+    };
+
+    assert_eq!(err, expected_err);
 }

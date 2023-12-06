@@ -1,6 +1,7 @@
 use proc_macro2::Span;
+use scale_info::form::PortableForm;
 use std::{borrow::Borrow, collections::HashMap};
-use syn::spanned::Spanned as _;
+use syn::{parse_quote, spanned::Spanned as _, PathSegment};
 
 use crate::typegen::{
     error::{TypeSubstitutionError, TypeSubstitutionErrorKind},
@@ -17,7 +18,7 @@ fn error(span: Span, kind: TypeSubstitutionErrorKind) -> TypeSubstitutionError {
 /// to figure out when to swap said type with some provided substitute.
 #[derive(Debug, Clone)]
 pub struct TypeSubstitutes {
-    substitutes: HashMap<PathSegments, Substitute>,
+    substitutes: HashMap<syn::Path, Substitute>,
 }
 
 /// A type that substitutes another type.
@@ -25,6 +26,13 @@ pub struct TypeSubstitutes {
 pub struct Substitute {
     path: syn::Path,
     param_mapping: TypeParamMapping,
+}
+
+impl Substitute {
+    /// Returns the type path of the substitute.
+    pub fn path(&self) -> &syn::Path {
+        &self.path
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -89,11 +97,10 @@ impl TypeSubstitutes {
     fn parse_path_substitution(
         src_path: syn::Path,
         target_path: syn::Path,
-    ) -> Result<(PathSegments, Substitute), TypeSubstitutionError> {
+    ) -> Result<(syn::Path, Substitute), TypeSubstitutionError> {
         let param_mapping = Self::parse_path_param_mapping(&src_path, &target_path)?;
-
         Ok((
-            PathSegments::from(&src_path),
+            src_path,
             Substitute {
                 // Note; at this point, target_path might have some generics still. These
                 // might be hardcoded types that we want to keep, so leave them here for now.
@@ -185,8 +192,8 @@ impl TypeSubstitutes {
     }
 
     /// Given a source type path, return whether a substitute exists for it.
-    pub fn contains(&self, path: impl Into<PathSegments>) -> bool {
-        let path_segments: PathSegments = path.into();
+    pub fn contains(&self, path: impl IntoSynPath) -> bool {
+        let path_segments = path.into_syn_path();
         self.substitutes.contains_key(&path_segments)
     }
 
@@ -194,7 +201,7 @@ impl TypeSubstitutes {
     /// return a new path and optionally overwritten type parameters.
     pub fn for_path_with_params(
         &self,
-        path: impl Into<PathSegments>,
+        path: impl IntoSynPath,
         params: &[TypePath],
     ) -> Option<TypePathType> {
         // If we find a substitute type, we'll take the substitute path, and
@@ -232,51 +239,16 @@ impl TypeSubstitutes {
             }
         }
 
-        let path = path.into();
+        let path = path.into_syn_path();
 
         self.substitutes
             .get(&path)
             .map(|sub| replace_params(sub.path.clone(), params, &sub.param_mapping))
     }
-}
 
-/// utility for constructing a `PathSegments` struct.
-#[macro_export]
-macro_rules! path_segments {
-    ($($ident: ident)::*) => {
-        PathSegments(
-            [$(stringify!($ident)),*].into_iter().map(String::from).collect::<Vec<_>>()
-        )
-    }
-}
-
-/// Identifiers joined by the `::` separator.
-///
-/// We use this as a common denominator, since we need a consistent keys for both
-/// `syn::TypePath` and `scale_info::ty::path::Path` types.
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct PathSegments(pub Vec<String>);
-
-impl From<&syn::Path> for PathSegments {
-    fn from(path: &syn::Path) -> Self {
-        PathSegments(path.segments.iter().map(|x| x.ident.to_string()).collect())
-    }
-}
-
-impl<'a> From<Vec<&'a str>> for PathSegments {
-    fn from(path: Vec<&'a str>) -> Self {
-        PathSegments(path.iter().map(|x| x.to_string()).collect())
-    }
-}
-
-impl<T: scale_info::form::Form> From<&scale_info::Path<T>> for PathSegments {
-    fn from(path: &scale_info::Path<T>) -> Self {
-        PathSegments(
-            path.segments
-                .iter()
-                .map(|x| x.as_ref().to_owned())
-                .collect(),
-        )
+    /// Returns an iterator over all substitutes.
+    pub fn iter(&self) -> impl Iterator<Item = (&syn::Path, &Substitute)> {
+        self.substitutes.iter()
     }
 }
 
@@ -375,6 +347,38 @@ fn is_absolute(path: &syn::Path) -> bool {
 /// tries to convert a [`syn::Path`] into an `AbsolutePath`. Only succeeds if the path is not a relative path.
 pub fn absolute_path(path: syn::Path) -> Result<AbsolutePath, TypeSubstitutionError> {
     path.try_into()
+}
+
+/// New-type trait for `Into<syn::Path>`
+pub trait IntoSynPath {
+    /// Turns the type into a [`syn::Path`].
+    fn into_syn_path(self) -> syn::Path;
+}
+
+impl<'a> IntoSynPath for &'a scale_info::Path<PortableForm> {
+    fn into_syn_path(self) -> syn::Path {
+        let segments = self.segments.iter().map(|e| {
+            syn::parse_str::<PathSegment>(e)
+                .expect("scale_info::Path segments should be syn::PathSegment compatible")
+        });
+        parse_quote!(#(#segments)::*)
+    }
+}
+
+impl<'a> IntoSynPath for &'a str {
+    fn into_syn_path(self) -> syn::Path {
+        let segments = self.split("::").map(|e| {
+            syn::parse_str::<PathSegment>(e)
+                .expect("string segments sparated by :: should be each a valid syn::PathSegment")
+        });
+        parse_quote!(#(#segments)::*)
+    }
+}
+
+impl IntoSynPath for syn::Path {
+    fn into_syn_path(self) -> syn::Path {
+        self
+    }
 }
 
 /// New-type wrapper around [`syn::Path`]

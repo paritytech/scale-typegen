@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use proc_macro2::Span;
 
 /// Error for when something went wrong during type generation.
@@ -25,6 +27,9 @@ pub enum TypegenError {
     /// Type substitution error.
     #[error("Type substitution error: {0}")]
     InvalidSubstitute(#[from] TypeSubstitutionError),
+    /// The settings do not fit the given type registry.
+    #[error("Settings do not fit the given type registry: {0}")]
+    SettingsValidation(SettingsValidationError),
 }
 
 /// Error attempting to do type substitution.
@@ -67,4 +72,32 @@ pub enum TypeSubstitutionErrorKind {
     /// Target ident doesn't correspond to any source type.
     #[error("Cannot find matching param on 'from' type.")]
     NoMatchingFromType,
+}
+
+/// Error attempting to do type substitution.
+#[derive(Debug, thiserror::Error, Default, PartialEq, Eq)]
+pub struct SettingsValidationError {
+    /// Cannot add derive for type that is not present in the registry.
+    pub derives_for_unknown_types: Vec<(syn::Path, HashSet<syn::Path>)>,
+    /// Cannot add attribute for type that is not present in the registry.
+    pub attributes_for_unknown_types: Vec<(syn::Path, HashSet<syn::Attribute>)>,
+    /// Invalid path to replace: the type getting substituted is not present in the registry.
+    pub substitutes_for_unknown_types: Vec<(syn::Path, syn::Path)>,
+}
+
+impl SettingsValidationError {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.derives_for_unknown_types.is_empty()
+            && self.attributes_for_unknown_types.is_empty()
+            && self.substitutes_for_unknown_types.is_empty()
+    }
+}
+
+impl std::fmt::Display for SettingsValidationError {
+    fn fmt(
+        &self,
+        f: &mut scale_info::prelude::fmt::Formatter<'_>,
+    ) -> scale_info::prelude::fmt::Result {
+        f.write_fmt(format_args!("{:?}", self))
+    }
 }
