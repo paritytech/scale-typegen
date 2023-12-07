@@ -7,7 +7,10 @@ use syn::parse_quote;
 
 use crate::{
     tests::utils::{subxt_settings, Testgen},
-    typegen::{error::SettingsValidationError, settings::TypeGeneratorSettings},
+    typegen::{
+        error::SettingsValidationError, settings::TypeGeneratorSettings,
+        validate_settings::similar_type_paths_in_registry,
+    },
     utils::ensure_unique_type_paths,
     DerivesRegistry, TypeGenerator, TypeSubstitutes,
 };
@@ -1294,4 +1297,43 @@ fn validation_errors() {
     };
 
     assert_eq!(err, expected_err);
+}
+
+#[test]
+fn find_similar_type_paths() {
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct S;
+    mod types {
+        #[allow(unused)]
+        #[derive(scale_info::TypeInfo)]
+        pub struct T;
+
+        #[allow(unused)]
+        #[derive(scale_info::TypeInfo)]
+        pub struct S;
+
+        pub mod abc {
+            #[allow(unused)]
+            #[derive(scale_info::TypeInfo)]
+            pub struct S;
+        }
+    }
+
+    let registry = Testgen::new()
+        .with::<S>()
+        .with::<types::S>()
+        .with::<types::T>()
+        .with::<types::abc::S>()
+        .into_portable_registry();
+
+    // user gives the wrong type location types::xyz::S => show them suggestions for correct paths.
+    let similar = similar_type_paths_in_registry(&registry, &parse_quote!(types::xyz::S));
+
+    let expected: Vec<syn::Path> = vec![
+        parse_quote!(scale_typegen::tests::S),
+        parse_quote!(scale_typegen::tests::types::S),
+        parse_quote!(scale_typegen::tests::types::abc::S),
+    ];
+    assert_eq!(similar, expected);
 }
