@@ -95,7 +95,7 @@ mod tests {
                 corners: u8,
                 radius: u64,
             },
-            MultiShape {
+            Multi {
                 shapes: Vec<Shape<u64>>,
                 t: T,
                 operation: Operation,
@@ -122,7 +122,7 @@ mod tests {
                     corners: u8,
                     radius: u64
                 },
-                MultiShape {
+                Multi {
                     shapes: Vec<
                         enum Shape {
                             Inivisible,
@@ -132,7 +132,7 @@ mod tests {
                                 corners: u8,
                                 radius: u64
                             },
-                            MultiShape {
+                            Multi {
                                 shapes: Vec<Shape>,
                                 t: u64,
                                 operation: enum Operation {

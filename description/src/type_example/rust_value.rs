@@ -139,10 +139,10 @@ pub fn example_from_seed(
 
     /// Note: because None is returned here, the transformer will just continue its work.
     fn compute_another_example(
-        type_id: u32,
-        ty: &Type<PortableForm>,
-        cached_value: &TokenStream,
-        transformer: &CodeTransformer,
+        _type_id: u32,
+        _ty: &Type<PortableForm>,
+        _cached_value: &TokenStream,
+        _transformer: &CodeTransformer,
     ) -> Option<anyhow::Result<TokenStream>> {
         None
     }

@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use scale_info::{
     form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeDefArray, TypeDefBitSequence,
     TypeDefCompact, TypeDefPrimitive, TypeDefSequence, TypeDefTuple, TypeDefVariant, Variant,
@@ -31,15 +30,15 @@ pub fn type_description(
     }
 
     fn return_type_name_on_cache_hit(
-        type_id: u32,
+        _type_id: u32,
         ty: &Type<PortableForm>,
         cached: &String,
-        transformer: &Transformer<String>,
+        _transformer: &Transformer<String>,
     ) -> Option<anyhow::Result<String>> {
         if let Some(type_name) = ty.path.ident() {
             return Some(Ok(type_name));
         }
-        Some(Ok(cached.clone()))
+        Some(Ok(cached.to_owned()))
     }
     let transformer = Transformer::new(
         ty_description,

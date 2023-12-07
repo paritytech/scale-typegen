@@ -31,10 +31,10 @@ pub fn example_from_seed(id: u32, types: &PortableRegistry, seed: u64) -> anyhow
 
     /// Note: because None is returned here, the transformer will just continue its work.
     fn compute_another_example(
-        type_id: u32,
-        ty: &Type<PortableForm>,
-        cached_value: &Value,
-        transformer: &ValueTransformer,
+        _type_id: u32,
+        _ty: &Type<PortableForm>,
+        _cached_value: &Value,
+        _transformer: &ValueTransformer,
     ) -> Option<anyhow::Result<Value>> {
         None
     }
