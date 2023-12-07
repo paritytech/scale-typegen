@@ -1,6 +1,6 @@
 use scale_info::{
-    form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeDefArray, TypeDefBitSequence,
-    TypeDefCompact, TypeDefPrimitive, TypeDefSequence, TypeDefTuple, TypeDefVariant, Variant,
+    form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeDefPrimitive, TypeDefTuple,
+    TypeDefVariant, Variant,
 };
 
 use crate::transformer::Transformer;
@@ -21,10 +21,10 @@ pub fn type_description(
     fn return_type_name(
         _type_id: u32,
         ty: &Type<PortableForm>,
-        _transformer: &Transformer<String>,
+        transformer: &Transformer<String>,
     ) -> Option<anyhow::Result<String>> {
-        if let Some(type_name) = ty.path.ident() {
-            return Some(Ok(type_name));
+        if ty.path.ident().is_some() {
+            return Some(Ok(type_name_with_type_params(ty, transformer.types())));
         }
         None
     }
@@ -33,10 +33,10 @@ pub fn type_description(
         _type_id: u32,
         ty: &Type<PortableForm>,
         cached: &String,
-        _transformer: &Transformer<String>,
+        transformer: &Transformer<String>,
     ) -> Option<anyhow::Result<String>> {
-        if let Some(type_name) = ty.path.ident() {
-            return Some(Ok(type_name));
+        if ty.path.ident().is_some() {
+            return Some(Ok(type_name_with_type_params(ty, transformer.types())));
         }
         Some(Ok(cached.to_owned()))
     }
@@ -59,14 +59,79 @@ fn ty_description(
     ty: &Type<PortableForm>,
     transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
-    let ident = ty.path.ident().unwrap_or_default();
+    let name_and_params = if ty.path.ident().is_some() {
+        type_name_with_type_params(ty, transformer.types())
+    } else {
+        String::new()
+    };
+
     let prefix = match &ty.type_def {
         TypeDef::Variant(_) => "enum ",
         TypeDef::Composite(_) => "struct ",
         _ => "",
     };
     let type_def_description = type_def_type_description(&ty.type_def, transformer)?;
-    Ok(format!("{prefix}{ident}{type_def_description}"))
+    Ok(format!("{prefix}{name_and_params}{type_def_description}"))
+}
+
+/// Can be None for types that have an empty path
+fn type_name_with_type_params(ty: &Type<PortableForm>, types: &PortableRegistry) -> String {
+    match &ty.type_def {
+        TypeDef::Sequence(s) => {
+            let inner = type_name_with_type_params(types.resolve(s.type_param.id).unwrap(), types);
+            return format!("Vec<{inner}>",);
+        }
+        TypeDef::Array(a) => {
+            let inner = type_name_with_type_params(types.resolve(a.type_param.id).unwrap(), types);
+            let len = a.len;
+            return format!("[{inner};{len}]",);
+        }
+        TypeDef::Tuple(t) => {
+            let mut output = "(".to_string();
+            let mut iter = t.fields.iter().peekable();
+            while let Some(ty) = iter.next() {
+                let type_name = type_name_with_type_params(types.resolve(ty.id).unwrap(), types);
+                output.push_str(&type_name);
+                if iter.peek().is_some() || t.fields.len() == 1 {
+                    output.push(',')
+                }
+            }
+            output.push(')');
+            return output;
+        }
+        TypeDef::Primitive(p) => return primitive_type_description(p).into(),
+        TypeDef::Compact(c) => {
+            let inner = type_name_with_type_params(types.resolve(c.type_param.id).unwrap(), types);
+            return format!("Compact<{inner}>",);
+        }
+        TypeDef::BitSequence(_) => return "BitSequence".into(),
+        TypeDef::Composite(_) => {}
+        TypeDef::Variant(_) => {}
+    }
+
+    let Some(ident) = ty.path.ident() else {
+        return "_".to_string(); // this should happen rarely
+    };
+
+    let params = ty
+        .type_params
+        .iter()
+        .map(|e| {
+            let Some(ty) = e.ty.as_ref() else {
+                return "_".to_string();
+            };
+
+            let ty = types.resolve(ty.id).unwrap();
+            type_name_with_type_params(ty, types)
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+
+    if params.is_empty() {
+        ident.to_string()
+    } else {
+        format!("{ident}<{}>", params)
+    }
 }
 
 fn type_def_type_description(
@@ -76,13 +141,25 @@ fn type_def_type_description(
     match type_def {
         TypeDef::Composite(composite) => fields_type_description(&composite.fields, transformer),
         TypeDef::Variant(variant) => variant_type_def_type_description(variant, transformer),
-        TypeDef::Sequence(sequence) => sequence_type_description(sequence, transformer),
-        TypeDef::Array(array) => array_type_description(array, transformer),
+        TypeDef::Sequence(sequence) => Ok(format!(
+            "Vec<{}>",
+            transformer.resolve(sequence.type_param.id)?
+        )),
+        TypeDef::Array(array) => Ok(format!(
+            "[{}; {}]",
+            transformer.resolve(array.type_param.id)?,
+            array.len
+        )),
         TypeDef::Tuple(tuple) => tuple_type_description(tuple, transformer),
-        TypeDef::Primitive(primitive) => primitive_type_description(primitive),
-        TypeDef::Compact(compact) => compact_type_description(compact, transformer),
+        TypeDef::Primitive(primitive) => Ok(primitive_type_description(primitive).into()),
+        TypeDef::Compact(compact) => Ok(format!(
+            "Compact<{}>",
+            transformer.resolve(compact.type_param.id)?
+        )),
         TypeDef::BitSequence(bit_sequence) => {
-            bit_sequence_type_description(bit_sequence, transformer)
+            let bit_order_type = transformer.resolve(bit_sequence.bit_order_type.id)?;
+            let bit_store_type = transformer.resolve(bit_sequence.bit_store_type.id)?;
+            Ok(format!("BitSequence({bit_order_type}, {bit_store_type})"))
         }
     }
 }
@@ -105,42 +182,8 @@ fn tuple_type_description(
     Ok(output)
 }
 
-fn bit_sequence_type_description(
-    bit_sequence: &TypeDefBitSequence<PortableForm>,
-    transformer: &Transformer<String>,
-) -> anyhow::Result<String> {
-    let bit_order_type = transformer.resolve(bit_sequence.bit_order_type.id)?;
-    let bit_store_type = transformer.resolve(bit_sequence.bit_store_type.id)?;
-    Ok(format!("BitSequence({bit_order_type}, {bit_store_type})"))
-}
-
-fn sequence_type_description(
-    sequence: &TypeDefSequence<PortableForm>,
-    transformer: &Transformer<String>,
-) -> anyhow::Result<String> {
-    let type_description = transformer.resolve(sequence.type_param.id)?;
-
-    Ok(format!("Vec<{type_description}>"))
-}
-
-fn compact_type_description(
-    compact: &TypeDefCompact<PortableForm>,
-    transformer: &Transformer<String>,
-) -> anyhow::Result<String> {
-    let type_description = transformer.resolve(compact.type_param.id)?;
-    Ok(format!("Compact<{type_description}>"))
-}
-
-fn array_type_description(
-    array: &TypeDefArray<PortableForm>,
-    transformer: &Transformer<String>,
-) -> anyhow::Result<String> {
-    let type_description = transformer.resolve(array.type_param.id)?;
-    Ok(format!("[{type_description}; {}]", array.len))
-}
-
-fn primitive_type_description(primitive: &TypeDefPrimitive) -> anyhow::Result<String> {
-    Ok(match &primitive {
+fn primitive_type_description(primitive: &TypeDefPrimitive) -> &'static str {
+    match &primitive {
         TypeDefPrimitive::Bool => "bool",
         TypeDefPrimitive::Char => "char",
         TypeDefPrimitive::Str => "String",
@@ -157,7 +200,6 @@ fn primitive_type_description(primitive: &TypeDefPrimitive) -> anyhow::Result<St
         TypeDefPrimitive::I128 => "i128",
         TypeDefPrimitive::I256 => "i256",
     }
-    .into())
 }
 
 fn variant_type_def_type_description(

@@ -114,7 +114,7 @@ mod tests {
         assert_eq!(
             type_description(type_id, &type_registry, true).unwrap(),
             indoc! {
-            "enum Shape {
+            "enum Shape<u8> {
                 Inivisible,
                 Circle(u64),
                 Rect(Compact<u64>, Compact<u64>),
@@ -124,7 +124,7 @@ mod tests {
                 },
                 Multi {
                     shapes: Vec<
-                        enum Shape {
+                        enum Shape<u64> {
                             Inivisible,
                             Circle(u64),
                             Rect(Compact<u64>, Compact<u64>),
@@ -133,7 +133,7 @@ mod tests {
                                 radius: u64
                             },
                             Multi {
-                                shapes: Vec<Shape>,
+                                shapes: Vec<Shape<u64>>,
                                 t: u64,
                                 operation: enum Operation {
                                     Add,
@@ -218,9 +218,9 @@ mod tests {
     fn recursive_generics() {
         #[allow(unused)]
         #[derive(TypeInfo)]
-        struct Vec2<C> {
-            x: Box<C>,
-            y: Box<C>,
+        struct Vec2<T> {
+            x: Box<T>,
+            y: Box<T>,
         }
 
         #[allow(unused)]
@@ -242,11 +242,11 @@ mod tests {
             type_description(type_id, &type_registry, true).unwrap(),
             indoc! {
             "struct A {
-                bees: struct Vec2 {
+                bees: struct Vec2<B> {
                     x: Box<
                         struct B {
                             id: u8,
-                            others: Vec2
+                            others: Vec2<B>
                         }
                     >,
                     y: Box<B>
