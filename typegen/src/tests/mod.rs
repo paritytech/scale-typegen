@@ -1274,15 +1274,26 @@ fn validation_errors() {
     let mut settings = TypeGeneratorSettings::new();
     settings.derives = {
         let mut d = DerivesRegistry::new();
-        d.extend_for_type(
+        d.add_derives_for(
             parse_quote!(scale_typegen::tests::S),
             [parse_quote!(Clone), parse_quote!(Reflect)],
+            true,
+        );
+
+        d.add_attributes_for(
+            parse_quote!(scale_typegen::tests::S),
             [parse_quote!(#[nice])],
             true,
         );
-        d.extend_for_type(
+
+        d.add_derives_for(
             parse_quote!(scale_typegen::tests::T),
             [parse_quote!(Clone), parse_quote!(Reflect)],
+            true,
+        );
+
+        d.add_attributes_for(
+            parse_quote!(scale_typegen::tests::T),
             [parse_quote!(#[nice])],
             true,
         );
