@@ -7,7 +7,7 @@ use rand::{seq::SliceRandom, Rng};
 use scale_info::{form::PortableForm, PortableRegistry, Type, TypeDef, TypeDefPrimitive};
 use scale_value::{BitSequence, Composite, Primitive, Value, ValueDef, Variant};
 
-use crate::transformer::{CacheHitPolicy, Transformer};
+use crate::transformer::Transformer;
 
 type ValueTransformer<'a> = Transformer<'a, Value, RefCell<rand_chacha::ChaCha8Rng>>;
 
@@ -23,16 +23,27 @@ pub fn example_from_seed(id: u32, types: &PortableRegistry, seed: u64) -> anyhow
         _type_id: u32,
         ty: &Type<PortableForm>,
         _transformer: &ValueTransformer,
-    ) -> anyhow::Result<Value> {
-        Err(anyhow!(
+    ) -> Option<anyhow::Result<Value>> {
+        Some(Err(anyhow!(
             "Cannot generate scale value example for recursive type: {ty:?}"
-        ))
+        )))
     }
+
+    /// Note: because None is returned here, the transformer will just continue its work.
+    fn compute_another_example(
+        type_id: u32,
+        ty: &Type<PortableForm>,
+        cached_value: &Value,
+        transformer: &ValueTransformer,
+    ) -> Option<anyhow::Result<Value>> {
+        None
+    }
+
     let state = RefCell::new(rand_chacha::ChaCha8Rng::seed_from_u64(seed));
     let transformer = ValueTransformer::new(
         ty_example,
         error_on_recurse,
-        CacheHitPolicy::ComputeAgain,
+        compute_another_example,
         state,
         types,
     );

@@ -20,33 +20,15 @@ pub struct Transformer<'a, R, S = ()> {
     /// The `recurse_policy` defines, how to handle cases, where a type has been
     /// visited before, and is visited *again*, before a representation of this type could be computed.
     /// It is up the implementation to return an error in these cases, or some other value.
-    recurse_policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
+    ///
+    /// You can return None to sidestep recursion protection and let the transformer continue.
+    recurse_policy: fn(u32, &Type<PortableForm>, &Self) -> Option<anyhow::Result<R>>,
     /// Describe the policy to apply when encountering a cache hit.
     /// A cache hit is, when the representation of a type has already been computed.
     ///
-    /// In this case there are 2 options:
-    /// - ReturnCached => return the cached value
-    /// - ExecuteRecursePolicy => execute the recurse policy
-    cache_hit_policy: CacheHitPolicy,
+    /// You can return None to sidestep recursion protection and let the transformer continue.
+    cache_hit_policy: fn(u32, &Type<PortableForm>, &R, &Self) -> Option<anyhow::Result<R>>,
     registry: &'a PortableRegistry,
-}
-
-/// The transformer stores computed representations of types in a cache.
-/// Sometimes we encounter types, where this representation is already computed.
-///
-/// The `CacheHitPolicy` defines, how to handle these cases.
-#[derive(Debug, Clone, Copy)]
-pub enum CacheHitPolicy {
-    /// Returns the computed value from the cache.
-    ReturnCached,
-    /// Ignore the cached value and just compute the representation of the type again.
-    ///
-    /// Note: This is safe from a recursion standpoint.
-    /// It is useful for generating multiple different type examples for one type instead of just returning the same one every time.
-    ComputeAgain,
-    /// Act like we were dealing with a recursive type. This will lead to the recurse policy being executed.
-    /// It can for example be used to return a placeholder value, e.g. the type name, when a type is encountered for the second time.
-    ExecuteRecursePolicy,
 }
 
 #[derive(Clone, Debug)]
@@ -61,10 +43,11 @@ impl<'a, R, S> Transformer<'a, R, S>
 where
     R: Clone + std::fmt::Debug,
 {
+    /// Create a new transformer.
     pub fn new(
         policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
-        recurse_policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
-        cache_hit_policy: CacheHitPolicy,
+        recurse_policy: fn(u32, &Type<PortableForm>, &Self) -> Option<anyhow::Result<R>>,
+        cache_hit_policy: fn(u32, &Type<PortableForm>, &R, &Self) -> Option<anyhow::Result<R>>,
         state: S,
         registry: &'a PortableRegistry,
     ) -> Self {
@@ -90,24 +73,17 @@ where
         ))?;
 
         match self.cache.borrow().get(&type_id) {
-            Some(Cached::Recursive) => {
-                if !recursion_should_continue(&ty.type_def) {
-                    return (self.recurse_policy)(type_id, ty, self);
+            Some(cache_value) => {
+                let result_or_continue = match cache_value {
+                    Cached::Recursive => (self.recurse_policy)(type_id, ty, self),
+                    Cached::Computed(repr) => (self.cache_hit_policy)(type_id, ty, repr, self),
+                };
+
+                if let Some(result) = result_or_continue {
+                    return result;
                 }
             }
-            Some(Cached::Computed(repr)) => {
-                match self.cache_hit_policy {
-                    CacheHitPolicy::ReturnCached => return Ok(repr.clone()),
-                    CacheHitPolicy::ExecuteRecursePolicy => {
-                        if !recursion_should_continue(&ty.type_def) {
-                            return (self.recurse_policy)(type_id, ty, self);
-                        }
-                    }
-                    CacheHitPolicy::ComputeAgain => {
-                        // ..continue with the computation
-                    }
-                };
-            }
+            Some(Cached::Computed(repr)) => {}
             _ => {}
         };
 

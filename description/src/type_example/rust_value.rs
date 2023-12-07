@@ -1,4 +1,4 @@
-use crate::transformer::{CacheHitPolicy, Transformer};
+use crate::transformer::Transformer;
 use anyhow::anyhow;
 use proc_macro2::{TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
@@ -131,10 +131,20 @@ pub fn example_from_seed(
         _type_id: u32,
         ty: &Type<PortableForm>,
         _transformer: &CodeTransformer,
-    ) -> anyhow::Result<TokenStream> {
-        Err(anyhow!(
+    ) -> Option<anyhow::Result<TokenStream>> {
+        Some(Err(anyhow!(
             "Cannot generate rust type example for recursive type: {ty:?}"
-        ))
+        )))
+    }
+
+    /// Note: because None is returned here, the transformer will just continue its work.
+    fn compute_another_example(
+        type_id: u32,
+        ty: &Type<PortableForm>,
+        cached_value: &TokenStream,
+        transformer: &CodeTransformer,
+    ) -> Option<anyhow::Result<TokenStream>> {
+        None
     }
 
     let state = CodeTransformerState {
@@ -147,7 +157,7 @@ pub fn example_from_seed(
     let transformer = CodeTransformer::new(
         ty_example,
         error_on_recurse,
-        CacheHitPolicy::ComputeAgain,
+        compute_another_example,
         state,
         types,
     );

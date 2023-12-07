@@ -4,7 +4,7 @@ use scale_info::{
     TypeDefCompact, TypeDefPrimitive, TypeDefSequence, TypeDefTuple, TypeDefVariant, Variant,
 };
 
-use crate::transformer::{CacheHitPolicy, Transformer};
+use crate::transformer::Transformer;
 
 use super::formatting::format_type_description;
 
@@ -19,21 +19,32 @@ pub fn type_description(
     type_registry: &PortableRegistry,
     format: bool,
 ) -> anyhow::Result<String> {
-    fn return_type_name_on_recurse(
+    fn return_type_name(
         _type_id: u32,
         ty: &Type<PortableForm>,
         _transformer: &Transformer<String>,
-    ) -> anyhow::Result<String> {
+    ) -> Option<anyhow::Result<String>> {
         if let Some(type_name) = ty.path.ident() {
-            return Ok(type_name);
+            return Some(Ok(type_name));
         }
-        Err(anyhow!("Recursive type that did not get handled properly"))
+        None
     }
 
+    fn return_type_name_on_cache_hit(
+        type_id: u32,
+        ty: &Type<PortableForm>,
+        cached: &String,
+        transformer: &Transformer<String>,
+    ) -> Option<anyhow::Result<String>> {
+        if let Some(type_name) = ty.path.ident() {
+            return Some(Ok(type_name));
+        }
+        Some(Ok(cached.clone()))
+    }
     let transformer = Transformer::new(
         ty_description,
-        return_type_name_on_recurse,
-        CacheHitPolicy::ExecuteRecursePolicy, // returns the type name in this case...
+        return_type_name,
+        return_type_name_on_cache_hit,
         (),
         type_registry,
     );

@@ -144,11 +144,7 @@ mod tests {
                         }
                     >,
                     t: u8,
-                    operation: enum Operation {
-                        Add,
-                        Intersect,
-                        Difference
-                    }
+                    operation: Operation
                 }
             }"}
         );
