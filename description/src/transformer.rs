@@ -68,6 +68,11 @@ where
         &self.state
     }
 
+    /// The type registry this transformer is operating on
+    pub fn types(&self) -> &PortableRegistry {
+        self.registry
+    }
+
     pub fn resolve(&self, type_id: u32) -> anyhow::Result<R> {
         let ty = self.registry.resolve(type_id).ok_or(anyhow::anyhow!(
             "Type with id {} not found in registry",
