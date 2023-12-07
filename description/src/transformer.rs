@@ -3,22 +3,50 @@ use std::{cell::RefCell, collections::HashMap};
 use scale_info::{form::PortableForm, PortableRegistry, Type, TypeDef};
 
 /// The transformer provides an abstraction for traversing a type registry
-/// given a type_id as a starting point, and **transforming** it into a tree-like structure.
-/// It provides a cache that shields users from infinite recursion.
+/// given a type_id as a starting point, and **transforming** it into a tree-like structure (type parameter `R`).
+/// For example, `R` might be a TokenStream, a String or a Scale Value.
+/// The transformer internally keeps a cache that shields users from infinite recursion.
+/// It can also contain a mutable state (type parameter `S`), that can be used to store additional information.
+/// This is useful for side effects, e.g. a random number generator for random type examples.
 ///
-/// In this way, we can have easy recursion protection mechanisms for type descirptions, rust type examples and scale value type examples.
+/// In this way, we can have easy recursion protection mechanisms for type descriptions, rust type examples and scale value type examples.
 pub struct Transformer<'a, R, S = ()> {
-    /// keep this private such that the cache is sealed and connot be accessed from outside of the Transformer::transform function
+    /// keep this private such that the cache is sealed and cannot be accessed from outside of the [`Transformer::transform`] function
     cache: RefCell<HashMap<u32, Cached<R>>>,
     /// state can be used for example for an Rng
-    pub state: S,
+    state: S,
     /// The `policy` defines, how to transform a type. If the type is unrepresentable, return an Err.
     policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
     /// The `recurse_policy` defines, how to handle cases, where a type has been
     /// visited before, and is visited *again*, before a representation of this type could be computed.
     /// It is up the implementation to return an error in these cases, or some other value.
     recurse_policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
+    /// Describe the policy to apply when encountering a cache hit.
+    /// A cache hit is, when the representation of a type has already been computed.
+    ///
+    /// In this case there are 2 options:
+    /// - ReturnCached => return the cached value
+    /// - ExecuteRecursePolicy => execute the recurse policy
+    cache_hit_policy: CacheHitPolicy,
     registry: &'a PortableRegistry,
+}
+
+/// The transformer stores computed representations of types in a cache.
+/// Sometimes we encounter types, where this representation is already computed.
+///
+/// The `CacheHitPolicy` defines, how to handle these cases.
+#[derive(Debug, Clone, Copy)]
+pub enum CacheHitPolicy {
+    /// Returns the computed value from the cache.
+    ReturnCached,
+    /// Ignore the cached value and just compute the representation of the type again.
+    ///
+    /// Note: This is safe from a recursion standpoint.
+    /// It is useful for generating multiple different type examples for one type instead of just returning the same one every time.
+    ComputeAgain,
+    /// Act like we were dealing with a recursive type. This will lead to the recurse policy being executed.
+    /// It can for example be used to return a placeholder value, e.g. the type name, when a type is encountered for the second time.
+    ExecuteRecursePolicy,
 }
 
 #[derive(Clone, Debug)]
@@ -36,6 +64,7 @@ where
     pub fn new(
         policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
         recurse_policy: fn(u32, &Type<PortableForm>, &Self) -> anyhow::Result<R>,
+        cache_hit_policy: CacheHitPolicy,
         state: S,
         registry: &'a PortableRegistry,
     ) -> Self {
@@ -45,7 +74,13 @@ where
             policy,
             recurse_policy,
             registry,
+            cache_hit_policy,
         }
+    }
+
+    /// The custom user defined state of the transformer.
+    pub fn state(&self) -> &S {
+        &self.state
     }
 
     pub fn resolve(&self, type_id: u32) -> anyhow::Result<R> {
@@ -60,7 +95,19 @@ where
                     return (self.recurse_policy)(type_id, ty, self);
                 }
             }
-            Some(Cached::Computed(r)) => return Ok(r.clone()),
+            Some(Cached::Computed(repr)) => {
+                match self.cache_hit_policy {
+                    CacheHitPolicy::ReturnCached => return Ok(repr.clone()),
+                    CacheHitPolicy::ExecuteRecursePolicy => {
+                        if !recursion_should_continue(&ty.type_def) {
+                            return (self.recurse_policy)(type_id, ty, self);
+                        }
+                    }
+                    CacheHitPolicy::ComputeAgain => {
+                        // ..continue with the computation
+                    }
+                };
+            }
             _ => {}
         };
 

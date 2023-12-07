@@ -21,7 +21,7 @@ pub fn main() {
         .decoded_bits_type_path(parse_quote!(DecodedBits))
         .compact_as_type_path(parse_quote!(parity_scale_codec::CompactAs))
         .compact_type_path(parse_quote!(parity_scale_codec::Compact))
-        .derive_on_all([parse_quote!(Debug), parse_quote!(Clone)]);
+        .add_derives_for_all([parse_quote!(Debug), parse_quote!(Clone)]);
 
     let type_generator = TypeGenerator::new(&type_registry, &settings);
     let code = type_generator

@@ -22,11 +22,7 @@ pub mod utils;
 
 pub use typegen::{
     error::TypegenError,
-    settings::{
-        derives::{Derives, DerivesRegistry},
-        substitutes::TypeSubstitutes,
-        TypeGeneratorSettings,
-    },
+    settings::{derives::DerivesRegistry, substitutes::TypeSubstitutes, TypeGeneratorSettings},
     TypeGenerator,
 };
 

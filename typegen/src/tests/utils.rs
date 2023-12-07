@@ -82,7 +82,9 @@ pub(super) fn subxt_default_derives() -> DerivesRegistry {
     ];
 
     let mut derives_registry = DerivesRegistry::new();
-    derives_registry.extend_for_all(derives, attributes);
+
+    derives_registry.add_derives_for_all(derives);
+    derives_registry.add_attributes_for_all(attributes);
     derives_registry
 }
 

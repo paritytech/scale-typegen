@@ -22,24 +22,23 @@ impl DerivesRegistry {
     }
 
     /// Insert derives to be applied to all generated types.
-    pub fn extend_for_all(
-        &mut self,
-        derives: impl IntoIterator<Item = syn::Path>,
-        attributes: impl IntoIterator<Item = syn::Attribute>,
-    ) {
+    pub fn add_derives_for_all(&mut self, derives: impl IntoIterator<Item = syn::Path>) {
         self.default_derives.derives.extend(derives);
+    }
+
+    /// Insert attributes to be applied to all generated types.
+    pub fn add_attributes_for_all(&mut self, attributes: impl IntoIterator<Item = syn::Attribute>) {
         self.default_derives.attributes.extend(attributes);
     }
 
     /// Insert derives to be applied to a specific generated type.
     ///
-    /// The `recursive` flag can be set if child types should also receive the given derives/attributes.
+    /// The `recursive` flag can be set if child types should also receive the given derives.
     /// Child types are all types that are mentioned as fields or type parameters of the type.
-    pub fn extend_for_type(
+    pub fn add_derives_for(
         &mut self,
         ty: syn::TypePath,
         derives: impl IntoIterator<Item = syn::Path>,
-        attributes: impl IntoIterator<Item = syn::Attribute>,
         recursive: bool,
     ) {
         let type_derives = if recursive {
@@ -48,6 +47,23 @@ impl DerivesRegistry {
             self.specific_type_derives.entry(ty).or_default()
         };
         type_derives.derives.extend(derives);
+    }
+
+    /// Insert derives to be applied to a specific generated type.
+    ///
+    /// The `recursive` flag can be set if child types should also receive the given derives.
+    /// Child types are all types that are mentioned as fields or type parameters of the type.
+    pub fn add_attributes_for(
+        &mut self,
+        ty: syn::TypePath,
+        attributes: impl IntoIterator<Item = syn::Attribute>,
+        recursive: bool,
+    ) {
+        let type_derives = if recursive {
+            self.recursive_type_derives.entry(ty).or_default()
+        } else {
+            self.specific_type_derives.entry(ty).or_default()
+        };
         type_derives.attributes.extend(attributes);
     }
 

@@ -7,7 +7,7 @@ use rand::{seq::SliceRandom, Rng};
 use scale_info::{form::PortableForm, PortableRegistry, Type, TypeDef, TypeDefPrimitive};
 use scale_value::{BitSequence, Composite, Primitive, Value, ValueDef, Variant};
 
-use crate::transformer::Transformer;
+use crate::transformer::{CacheHitPolicy, Transformer};
 
 type ValueTransformer<'a> = Transformer<'a, Value, RefCell<rand_chacha::ChaCha8Rng>>;
 
@@ -29,7 +29,13 @@ pub fn example_from_seed(id: u32, types: &PortableRegistry, seed: u64) -> anyhow
         ))
     }
     let state = RefCell::new(rand_chacha::ChaCha8Rng::seed_from_u64(seed));
-    let transformer = ValueTransformer::new(ty_example, error_on_recurse, state, types);
+    let transformer = ValueTransformer::new(
+        ty_example,
+        error_on_recurse,
+        CacheHitPolicy::ComputeAgain,
+        state,
+        types,
+    );
     transformer.resolve(id)
 }
 
@@ -50,7 +56,7 @@ fn ty_example(
         TypeDef::Variant(variant) => {
             let random_variant = variant
                 .variants
-                .choose(&mut *transformer.state.borrow_mut())
+                .choose(&mut *transformer.state().borrow_mut())
                 .ok_or_else(|| anyhow!("Variant type should have at least one variant"))?;
             let fields = random_variant
                 .fields
@@ -87,12 +93,12 @@ fn ty_example(
         }
         TypeDef::Primitive(primitive) => Ok(primitive_type_def_example(
             primitive,
-            &mut *transformer.state.borrow_mut(),
+            &mut *transformer.state().borrow_mut(),
         )),
         TypeDef::Compact(compact) => transformer.resolve(compact.type_param.id),
         TypeDef::BitSequence(_) => {
             let mut bit_sequence = BitSequence::new();
-            let rng = &mut *transformer.state.borrow_mut();
+            let rng = &mut *transformer.state().borrow_mut();
             for _ in 0..rng.gen_range(3..7) {
                 bit_sequence.push(rng.gen());
             }

@@ -1,4 +1,4 @@
-use crate::transformer::Transformer;
+use crate::transformer::{CacheHitPolicy, Transformer};
 use anyhow::anyhow;
 use proc_macro2::{TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
@@ -35,14 +35,14 @@ impl<'a> CodeTransformer<'a> {
     /// and, if the correct ty_path_middleware is set, prunes the resulting type path.
     fn resolve_type_path_omit_generics(&self, type_id: u32) -> anyhow::Result<TokenStream> {
         let mut type_path = self
-            .state
+            .state()
             .type_generator
             .resolve_type_path(type_id)
             .map_err(|e| anyhow!("{e}"))?
             .to_token_stream();
 
         // apply ty path middleware pruning/replacing paths:
-        if let Some(ty_path_middleware) = &self.state.ty_path_middleware {
+        if let Some(ty_path_middleware) = &self.state().ty_path_middleware {
             type_path = ty_path_middleware(type_path);
         };
 
@@ -62,7 +62,7 @@ impl<'a> CodeTransformer<'a> {
 
     fn has_unused_type_params(&self, ty: &Type<PortableForm>) -> anyhow::Result<bool> {
         let has_unused_type_params = self
-            .state
+            .state()
             .type_generator
             .create_type_ir(ty, &Default::default()) // Note: derives not important here.
             .map_err(|e| anyhow!("{e}"))?
@@ -72,7 +72,7 @@ impl<'a> CodeTransformer<'a> {
     }
 
     fn resolve_type(&self, type_id: u32) -> anyhow::Result<&Type<PortableForm>> {
-        self.state
+        self.state()
             .type_generator
             .resolve_type(type_id)
             .map_err(|e| anyhow!("{e}"))
@@ -144,7 +144,13 @@ pub fn example_from_seed(
         ty_path_middleware,
     };
 
-    let transformer = CodeTransformer::new(ty_example, error_on_recurse, state, types);
+    let transformer = CodeTransformer::new(
+        ty_example,
+        error_on_recurse,
+        CacheHitPolicy::ComputeAgain,
+        state,
+        types,
+    );
     transformer.resolve(type_id)
 }
 
@@ -154,7 +160,7 @@ fn ty_example(
     transformer: &CodeTransformer,
 ) -> anyhow::Result<TokenStream> {
     // if middleware wants to intersect and return something else, it can:
-    if let Some(middleware) = &transformer.state.ty_middleware {
+    if let Some(middleware) = &transformer.state().ty_middleware {
         if let Some(intersected) = middleware(ty, transformer) {
             return intersected;
         }
@@ -174,10 +180,10 @@ fn ty_example(
             let enum_path = transformer.resolve_type_path_omit_generics(type_id)?;
             let random_variant = variant
                 .variants
-                .choose(&mut *transformer.state.rng.borrow_mut())
+                .choose(&mut *transformer.state().rng.borrow_mut())
                 .ok_or_else(|| anyhow!("Variant type should have at least one variant"))?;
             let variant_ident = format_ident!("{}", &random_variant.name);
-            // never needs phantom data, because phantom data is generated as a separate variant.
+            // Never needs phantom data, because phantom data is generated as a separate variant.
             let fields = fields_example(&random_variant.fields, false, transformer)?;
             let mut example = quote!(#enum_path::#variant_ident #fields);
 
@@ -188,10 +194,11 @@ fn ty_example(
             Ok(example)
         }
         scale_info::TypeDef::Sequence(def) => {
-            // return a Vec with 2 elements:
+            // Return a Vec with 2 random example elements:
             let inner_ty = transformer.resolve_type(def.type_param.id)?;
-            let item_code = ty_example(def.type_param.id, inner_ty, transformer)?;
-            let vec_code = quote!(vec![#item_code, #item_code, #item_code]);
+            let item1 = ty_example(def.type_param.id, inner_ty, transformer)?;
+            let item2 = ty_example(def.type_param.id, inner_ty, transformer)?;
+            let vec_code = quote!(vec![#item1, #item2]);
             Ok(vec_code)
         }
         scale_info::TypeDef::Array(def) => {
@@ -200,10 +207,10 @@ fn ty_example(
             let inner_is_copy = transformer.type_def_is_copy(&inner_ty.type_def)?;
             let len = def.len as usize;
             let arr_code = if inner_is_copy {
-                // if the item_code is an expression that is `Copy` we can use short init syntax:
+                // If the item_code is an expression that is `Copy` we can use short init syntax:
                 quote!([#item_code;#len])
             } else {
-                // otherwise we need to duplicate the item_code `len` times:
+                // Otherwise we need to duplicate the item_code `len` times:
                 let item_iter = (0..len).map(|_| &item_code);
                 quote!([#(#item_iter),*])
             };
@@ -219,7 +226,7 @@ fn ty_example(
         }
         scale_info::TypeDef::Primitive(def) => Ok(primitive_example(
             def,
-            &mut *transformer.state.rng.borrow_mut(),
+            &mut *transformer.state().rng.borrow_mut(),
         )),
         scale_info::TypeDef::Compact(def) => {
             let code = transformer.resolve(def.type_param.id)?;

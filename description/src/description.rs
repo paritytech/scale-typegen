@@ -4,7 +4,7 @@ use scale_info::{
     TypeDefCompact, TypeDefPrimitive, TypeDefSequence, TypeDefTuple, TypeDefVariant, Variant,
 };
 
-use crate::transformer::Transformer;
+use crate::transformer::{CacheHitPolicy, Transformer};
 
 use super::formatting::format_type_description;
 
@@ -33,6 +33,7 @@ pub fn type_description(
     let transformer = Transformer::new(
         ty_description,
         return_type_name_on_recurse,
+        CacheHitPolicy::ExecuteRecursePolicy, // returns the type name in this case...
         (),
         type_registry,
     );
@@ -64,7 +65,6 @@ fn type_def_type_description(
 ) -> anyhow::Result<String> {
     match type_def {
         TypeDef::Composite(composite) => fields_type_description(&composite.fields, transformer),
-
         TypeDef::Variant(variant) => variant_type_def_type_description(variant, transformer),
         TypeDef::Sequence(sequence) => sequence_type_description(sequence, transformer),
         TypeDef::Array(array) => array_type_description(array, transformer),
@@ -83,10 +83,11 @@ fn tuple_type_description(
 ) -> anyhow::Result<String> {
     let mut output = "(".to_string();
     let mut iter = tuple.fields.iter().peekable();
+    let field_count = tuple.fields.len();
     while let Some(ty) = iter.next() {
         let type_description = transformer.resolve(ty.id)?;
         output.push_str(&type_description);
-        if iter.peek().is_some() {
+        if iter.peek().is_some() || field_count == 1 {
             output.push(',')
         }
     }
@@ -221,7 +222,6 @@ fn field_type_description(
     transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
     let mut type_description = transformer.resolve(field.ty.id)?;
-
     let is_boxed = field
         .type_name
         .as_ref()

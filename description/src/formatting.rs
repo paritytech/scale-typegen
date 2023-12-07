@@ -15,6 +15,8 @@ pub fn format_type_description(input: &str) -> String {
 
     const SMALL_SCOPE_MAX_TOKENS: usize = 32;
     /// should be called on the chars iterator shortly after open_token was encountered.
+    ///
+    /// scope should never be considered small if any curly braces are encountered inbetween.
     fn scope_is_small(
         chars: &mut PeekMoreIterator<Chars>,
         open_token: char,
@@ -34,6 +36,9 @@ pub fn format_type_description(input: &str) -> String {
                 if open_close_balance == 0 {
                     return true;
                 }
+            }
+            if *ch == '{' {
+                return false;
             }
         }
         false
