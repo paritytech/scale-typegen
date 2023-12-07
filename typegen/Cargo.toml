@@ -12,7 +12,6 @@ description = "Type Generation for SCALE encoded Rust Types"
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 scale-info = { workspace = true }
-smallvec = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
 
