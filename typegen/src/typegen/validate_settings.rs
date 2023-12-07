@@ -2,7 +2,7 @@ use scale_info::{form::PortableForm, PortableRegistry};
 
 use crate::TypeGenerator;
 
-use super::{error::SettingsValidationError, settings::substitutes::IntoSynPath};
+use super::{error::SettingsValidationError, settings::substitutes::TryIntoSynPath};
 
 impl<'a> TypeGenerator<'a> {
     /// Validates that the settings given are valid for the type registry.
@@ -92,7 +92,7 @@ pub fn similar_type_paths_in_registry(
             let path = &t.ty.path;
             path.ident()
                 .filter(|ident| ident == scale_type_path.ident().as_ref().expect("qed"))?;
-            Some((&path).into_syn_path())
+            path.syn_path()
         })
         .collect()
 }

@@ -192,16 +192,18 @@ impl TypeSubstitutes {
     }
 
     /// Given a source type path, return whether a substitute exists for it.
-    pub fn contains(&self, path: impl IntoSynPath) -> bool {
-        let path_segments = path.into_syn_path();
-        self.substitutes.contains_key(&path_segments)
+    pub fn contains(&self, path: impl TryIntoSynPath) -> bool {
+        let Some(syn_path) = path.syn_path() else {
+            return false;
+        };
+        self.substitutes.contains_key(&syn_path)
     }
 
     /// Given a source type path and the resolved, supplied type parameters,
     /// return a new path and optionally overwritten type parameters.
     pub fn for_path_with_params(
         &self,
-        path: impl IntoSynPath,
+        path: impl TryIntoSynPath,
         params: &[TypePath],
     ) -> Option<TypePathType> {
         // If we find a substitute type, we'll take the substitute path, and
@@ -239,8 +241,7 @@ impl TypeSubstitutes {
             }
         }
 
-        let path = path.into_syn_path();
-
+        let path = path.syn_path()?;
         self.substitutes
             .get(&path)
             .map(|sub| replace_params(sub.path.clone(), params, &sub.param_mapping))
@@ -349,35 +350,28 @@ pub fn absolute_path(path: syn::Path) -> Result<AbsolutePath, TypeSubstitutionEr
     path.try_into()
 }
 
-/// New-type trait for `Into<syn::Path>`
-pub trait IntoSynPath {
-    /// Turns the type into a [`syn::Path`].
-    fn into_syn_path(self) -> syn::Path;
+/// New-type trait for `TryInto<syn::Path>`
+pub trait TryIntoSynPath {
+    /// Turns the type into a [`syn::Path`]. Returns None for empty paths.
+    fn syn_path(self) -> Option<syn::Path>;
 }
 
-impl<'a> IntoSynPath for &'a scale_info::Path<PortableForm> {
-    fn into_syn_path(self) -> syn::Path {
+impl<'a> TryIntoSynPath for &'a scale_info::Path<PortableForm> {
+    fn syn_path(self) -> Option<syn::Path> {
+        if self.segments.is_empty() {
+            return None;
+        }
         let segments = self.segments.iter().map(|e| {
             syn::parse_str::<PathSegment>(e)
                 .expect("scale_info::Path segments should be syn::PathSegment compatible")
         });
-        parse_quote!(#(#segments)::*)
+        Some(parse_quote!(#(#segments)::*))
     }
 }
 
-impl<'a> IntoSynPath for &'a str {
-    fn into_syn_path(self) -> syn::Path {
-        let segments = self.split("::").map(|e| {
-            syn::parse_str::<PathSegment>(e)
-                .expect("string segments sparated by :: should be each a valid syn::PathSegment")
-        });
-        parse_quote!(#(#segments)::*)
-    }
-}
-
-impl IntoSynPath for syn::Path {
-    fn into_syn_path(self) -> syn::Path {
-        self
+impl TryIntoSynPath for syn::Path {
+    fn syn_path(self) -> Option<syn::Path> {
+        Some(self)
     }
 }
 

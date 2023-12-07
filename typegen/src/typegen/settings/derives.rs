@@ -133,9 +133,7 @@ impl DerivesRegistry {
     }
 
     /// An iterator over (syn::TypePath, Derives) pairs for specific types (also recursive ones).
-    pub fn derives_on_specific_types<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = (&'a syn::TypePath, &'a Derives)> {
+    pub fn derives_on_specific_types(&self) -> impl Iterator<Item = (&syn::TypePath, &Derives)> {
         self.specific_type_derives
             .iter()
             .chain(self.recursive_type_derives.iter())
