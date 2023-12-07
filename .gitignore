@@ -7,3 +7,5 @@
 .idea
 
 Cargo.lock
+
+/artifacts/*.rs

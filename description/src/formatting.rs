@@ -3,6 +3,7 @@ use std::str::Chars;
 use peekmore::{PeekMore, PeekMoreIterator};
 use smallvec::SmallVec;
 
+/// Formats a type description string to have nice indents.
 pub fn format_type_description(input: &str) -> String {
     /// Big scope means we want to spread out items over multiple lines.
     /// Small scope means, we want to keep it compact (on one line).
@@ -12,8 +13,10 @@ pub fn format_type_description(input: &str) -> String {
         Small,
     }
 
-    const SMALL_SCOPE_MAX_TOKENS: usize = 10;
+    const SMALL_SCOPE_MAX_TOKENS: usize = 32;
     /// should be called on the chars iterator shortly after open_token was encountered.
+    ///
+    /// scope should never be considered small if any curly braces are encountered inbetween.
     fn scope_is_small(
         chars: &mut PeekMoreIterator<Chars>,
         open_token: char,
@@ -33,6 +36,9 @@ pub fn format_type_description(input: &str) -> String {
                 if open_close_balance == 0 {
                     return true;
                 }
+            }
+            if *ch == '{' {
+                return false;
             }
         }
         false

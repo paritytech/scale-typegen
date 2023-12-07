@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! A library based on [scale-info](https://github.com/paritytech/scale-info) to transpile portable registries of types into rust type definitions.
+#![deny(missing_docs)]
+
+/// Type Generation Settings and Logic
 pub mod typegen;
+/// Utilities for handling Type Registries
 pub mod utils;
 
 pub use typegen::{
     error::TypegenError,
-    settings::{
-        derives::{Derives, DerivesRegistry},
-        substitutes::TypeSubstitutes,
-        TypeGeneratorSettings,
-    },
+    settings::{derives::DerivesRegistry, substitutes::TypeSubstitutes, TypeGeneratorSettings},
     TypeGenerator,
 };
 

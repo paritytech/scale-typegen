@@ -1,9 +1,12 @@
-use crate::{Derives, TypegenError};
+use crate::TypegenError;
 
 use self::{
     ir::module_ir::ModuleIR,
     ir::type_ir::{CompositeFieldIR, CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
-    settings::TypeGeneratorSettings,
+    settings::{
+        derives::{Derives, FlatDerivesRegistry},
+        TypeGeneratorSettings,
+    },
     type_params::TypeParameters,
     type_path::TypeParameter,
 };
@@ -13,14 +16,21 @@ use quote::quote;
 use scale_info::{form::PortableForm, PortableRegistry, Type, TypeDef};
 use syn::parse_quote;
 
+/// Custom error types.
 pub mod error;
+/// Intermediate representation of types and modules.
 pub mod ir;
+/// Utility extension functions on the `TypeGenerator` struct to resolve type paths.
 pub mod resolve_type_paths;
+/// Settings passed into the `TypeGenerator`.
 pub mod settings;
+/// Logic for dealing with used and unused generic type parameters.
 pub mod type_params;
+/// Type path definition and conversion into tokens.
 pub mod type_path;
 
 /// An interface for generating a types module.
+#[derive(Debug, Clone, Copy)]
 pub struct TypeGenerator<'a> {
     type_registry: &'a PortableRegistry,
     settings: &'a TypeGeneratorSettings,
@@ -35,16 +45,29 @@ impl<'a> TypeGenerator<'a> {
         }
     }
 
+    /// The name of the generated module which will contain the generated types.
     pub fn types_mod_ident(&self) -> &Ident {
         &self.settings.types_mod_ident
     }
 
+    /// The settings used by this type generator.
     pub fn settings(&self) -> &TypeGeneratorSettings {
         self.settings
     }
 
+    /// The type registry backing this type generator.
+    pub fn types(&self) -> &PortableRegistry {
+        self.type_registry
+    }
+
     /// Generate a module containing all types defined in the supplied type registry.
     pub fn generate_types_mod(&self) -> Result<ModuleIR, TypegenError> {
+        let flat_derives_registry = self
+            .settings
+            .derives
+            .clone()
+            .flatten_recursive_derives(self.type_registry)?;
+
         let mut root_mod = ModuleIR::new(
             self.settings.types_mod_ident.clone(),
             self.settings.types_mod_ident.clone(),
@@ -65,7 +88,7 @@ impl<'a> TypeGenerator<'a> {
             }
 
             // if the type is not a builtin type, insert it into the respective module
-            if let Some(type_ir) = self.create_type_ir(&ty.ty)? {
+            if let Some(type_ir) = self.create_type_ir(&ty.ty, &flat_derives_registry)? {
                 // Create the module this type should go into
                 let innermost_module = root_mod.get_or_insert_submodule(namespace);
                 innermost_module.types.insert(path.clone(), type_ir);
@@ -75,7 +98,12 @@ impl<'a> TypeGenerator<'a> {
         Ok(root_mod)
     }
 
-    pub fn create_type_ir(&self, ty: &Type<PortableForm>) -> Result<Option<TypeIR>, TypegenError> {
+    /// Creates an intermediate representation of a type that can later be converted into rust tokens.
+    pub fn create_type_ir(
+        &self,
+        ty: &Type<PortableForm>,
+        flat_derives_registry: &FlatDerivesRegistry,
+    ) -> Result<Option<TypeIR>, TypegenError> {
         // if the type is some builtin, early return, we are only interested in generating structs and enums.
         if !matches!(ty.type_def, TypeDef::Composite(_) | TypeDef::Variant(_)) {
             return Ok(None);
@@ -124,7 +152,7 @@ impl<'a> TypeGenerator<'a> {
             _ => unreachable!("Other variants early return before. qed."),
         };
 
-        let mut derives = self.type_derives(ty)?;
+        let mut derives = flat_derives_registry.resolve_derives_for_type(ty)?;
         if could_derive_as_compact {
             self.add_as_compact_derive(&mut derives);
         }
@@ -146,6 +174,7 @@ impl<'a> TypeGenerator<'a> {
             .unwrap_or_default()
     }
 
+    /// Creates an intermediate representation of a composite.
     pub fn create_composite_ir_kind(
         &self,
         fields: &[scale_info::Field<PortableForm>],
@@ -219,6 +248,8 @@ impl<'a> TypeGenerator<'a> {
         }
     }
 
+    /// Creates the intermediate representation of a type from just a composite definition.
+    /// This uses just the default derives and type params are left empty.
     pub fn upcast_composite(&self, composite: &CompositeIR) -> TypeIR {
         // just use Default Derives + AsCompact. No access to type specific derives here. (Mainly used in subxt to create structs from enum variants...)
         let mut derives = self.settings.derives.default_derives().clone();
@@ -231,17 +262,6 @@ impl<'a> TypeGenerator<'a> {
             insert_codec_attributes: self.settings.insert_codec_attributes,
             kind: TypeIRKind::Struct(composite.clone()),
         }
-    }
-
-    pub fn default_derives(&self) -> &Derives {
-        self.settings.derives.default_derives()
-    }
-
-    pub fn type_derives(&self, ty: &Type<PortableForm>) -> Result<Derives, TypegenError> {
-        let joined_path = ty.path.segments.join("::");
-        let ty_path: syn::TypePath = syn::parse_str(&joined_path)?;
-        let derives = self.settings.derives.resolve(&ty_path);
-        Ok(derives)
     }
 
     /// Adds a AsCompact derive, if a path to AsCompact trait/derive macro set in settings.

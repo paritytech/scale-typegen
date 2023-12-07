@@ -10,9 +10,13 @@ use scale_info::form::PortableForm;
 /// Represents a Rust `mod`, containing generated types and child `mod`s.
 #[derive(Debug, Clone)]
 pub struct ModuleIR {
+    /// Name of this module.
     pub name: Ident,
+    /// Root module identifier.
     pub root_mod: Ident,
+    /// Submodules of this module.
     pub children: BTreeMap<Ident, ModuleIR>,
+    /// Types in this module.
     pub types: BTreeMap<scale_info::Path<PortableForm>, TypeIR>,
 }
 
@@ -65,6 +69,8 @@ impl ModuleIR {
         &self.root_mod
     }
 
+    /// Recursively creates submodules for the given namespace and returns a mutable reference to the innermost module created this way.
+    /// Returns itself, if the namespace is empty.
     pub fn get_or_insert_submodule(&mut self, namespace: &[String]) -> &mut ModuleIR {
         if namespace.is_empty() {
             return self;

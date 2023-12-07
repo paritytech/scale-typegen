@@ -19,9 +19,9 @@ fn substitutes_and_derives() {
     // set up settings
     let settings = TypeGeneratorSettings::default()
         .type_mod_name("my_types")
-        .derive_on_all([
+        .add_derives_for_all([
             parse_quote!(::parity_scale_codec::Decode),
-            parse_quote!(::parity_scale_codec::Emcode),
+            parse_quote!(::parity_scale_codec::Encode),
         ])
         .substitute(
             parse_quote!(BTreeMap),
@@ -44,7 +44,7 @@ fn substitutes_and_derives() {
                 use super::my_types;
                 pub mod tests {
                     use super::my_types;
-                    #[derive(:: parity_scale_codec :: Decode, :: parity_scale_codec :: Emcode)]
+                    #[derive(:: parity_scale_codec :: Decode, :: parity_scale_codec :: Encode)]
                     pub struct A {
                         pub children: ::std::collections::HashMap< ::core::primitive::u32, my_types::scale_typegen::tests::A>,
                     }
@@ -919,10 +919,12 @@ fn apply_user_defined_derives_for_all_types() {
     struct B;
 
     let mut settings = subxt_settings();
-    settings.derives.extend_for_all(
-        [parse_quote!(Clone), parse_quote!(Eq)],
-        [parse_quote!(#[some_attribute])],
-    );
+    settings
+        .derives
+        .add_derives_for_all([parse_quote!(Clone), parse_quote!(Eq)]);
+    settings
+        .derives
+        .add_attributes_for_all([parse_quote!(#[some_attribute])]);
 
     let code = Testgen::new().with::<A>().gen_tests_mod(settings);
 
@@ -964,20 +966,26 @@ fn apply_user_defined_derives_for_specific_types() {
     struct C;
 
     let mut settings = subxt_settings();
-    settings.derives.extend_for_all([parse_quote!(Eq)], []);
-    settings.derives.extend_for_type(
+    settings.derives.add_derives_for_all([parse_quote!(Eq)]);
+    settings.derives.add_derives_for(
         parse_quote!(scale_typegen::tests::B),
         [parse_quote!(Hash)],
-        [parse_quote!(#[some_attribute])],
+        false,
     );
-    settings.derives.extend_for_type(
+    settings.derives.add_attributes_for(
+        parse_quote!(scale_typegen::tests::B),
+        [parse_quote!(#[some_attribute])],
+        false,
+    );
+
+    settings.derives.add_derives_for(
         parse_quote!(scale_typegen::tests::C),
         [
             parse_quote!(Eq),
             parse_quote!(Ord),
             parse_quote!(PartialOrd),
         ],
-        [],
+        false,
     );
     let code = Testgen::new().with::<A>().gen_tests_mod(settings);
 
@@ -1010,7 +1018,113 @@ fn apply_user_defined_derives_for_specific_types() {
 }
 
 #[test]
-fn opt_out_from_default_derives() {
+fn apply_recursive_derives() {
+    use std::collections::BTreeMap;
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct Human {
+        organ_status: BTreeMap<Organ, Status>,
+        profession: Profession,
+        organs: Vec<Organ>,
+    }
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    enum Organ {
+        Heart,
+        Stomach,
+    }
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct Status {
+        damage: Compact<u32>,
+    }
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    enum Profession {
+        Student { college: String },
+        Programmer,
+    }
+
+    let mut derives = DerivesRegistry::new();
+
+    derives.add_derives_for(
+        parse_quote!(scale_typegen::tests::Human),
+        vec![parse_quote!(Reflect)],
+        false,
+    );
+
+    derives.add_attributes_for(
+        parse_quote!(scale_typegen::tests::Human),
+        vec![parse_quote!(#[is_human])],
+        false,
+    );
+
+    derives.add_derives_for(
+        parse_quote!(scale_typegen::tests::Human),
+        vec![parse_quote!(Clone)],
+        true,
+    );
+
+    derives.add_attributes_for(
+        parse_quote!(scale_typegen::tests::Human),
+        vec![parse_quote!(#[is_nice])],
+        true,
+    );
+
+    let settings = TypeGeneratorSettings {
+        derives,
+        ..subxt_settings()
+    };
+    let code = Testgen::new().with::<Human>().gen_tests_mod(settings);
+
+    let expected_code = quote! {
+        pub mod tests {
+            use super::root;
+            #[derive(Clone, Reflect)]
+            #[is_human]
+            #[is_nice]
+            pub struct Human {
+                pub organ_status: ::subxt_path::utils::KeyedVec<
+                    root::scale_typegen::tests::Organ,
+                    root::scale_typegen::tests::Status
+                >,
+                pub profession: root::scale_typegen::tests::Profession,
+                pub organs: ::std::vec::Vec<root::scale_typegen::tests::Organ>,
+            }
+            #[derive(Clone)]
+            #[is_nice]
+            pub enum Organ {
+                #[codec(index = 0)]
+                Heart,
+                #[codec(index = 1)]
+                Stomach,
+            }
+            #[derive(Clone)]
+            #[is_nice]
+            pub enum Profession {
+                #[codec(index = 0)]
+                Student { college: ::std::string::String , },
+                #[codec(index = 1)]
+                Programmer,
+            }
+            #[derive(Clone)]
+            #[is_nice]
+            pub struct Status {
+                #[codec(compact)]
+                pub damage: ::core::primitive::u32,
+            }
+        }
+    };
+
+    assert_eq!(code.to_string(), expected_code.to_string());
+}
+
+#[test]
+fn apply_derives() {
     #[allow(unused)]
     #[derive(TypeInfo)]
     struct A(B);
@@ -1020,14 +1134,19 @@ fn opt_out_from_default_derives() {
     struct B;
 
     let mut derives = DerivesRegistry::new();
-    derives.extend_for_all(
-        vec![parse_quote!(Clone), parse_quote!(Eq)],
-        vec![parse_quote!(#[some_attribute])],
-    );
-    derives.extend_for_type(
+    derives.add_derives_for_all(vec![parse_quote!(Clone), parse_quote!(Eq)]);
+    derives.add_attributes_for_all(vec![parse_quote!(#[some_attribute])]);
+
+    derives.add_derives_for(
         parse_quote!(scale_typegen::tests::B),
         vec![parse_quote!(Hash)],
+        false,
+    );
+
+    derives.add_attributes_for(
+        parse_quote!(scale_typegen::tests::B),
         vec![parse_quote!(#[some_other_attribute])],
+        false,
     );
 
     let settings = TypeGeneratorSettings {
@@ -1057,7 +1176,7 @@ fn opt_out_from_default_derives() {
 /// By default a BTreeMap would be replaced by a KeyedVec.
 /// This test demonstrates that it does not happen if we opt out of default type substitutes.
 #[test]
-fn opt_out_from_default_substitutes() {
+fn apply_custom_substitutes() {
     use std::collections::BTreeMap;
 
     #[allow(unused)]

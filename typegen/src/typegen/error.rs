@@ -1,20 +1,28 @@
 use proc_macro2::Span;
 
+/// Error for when something went wrong during type generation.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum TypegenError {
+    /// Could not parse into a syn type.
     #[error("Could not parse into a syn type: {0}")]
     SynParseError(#[from] syn::Error),
+    /// Fields should either be all named or all unnamed, make sure you are providing a valid metadata.
     #[error("Fields should either be all named or all unnamed, make sure you are providing a valid metadata: {0}")]
     InvalidFields(String),
+    /// A type in the metadata was invalid
     #[error("A type in the metadata was invalid: {0}")]
     InvalidType(String),
+    /// Could not generate a type that contains a compact type, because the Compact type path is not set in the settings.
     #[error("Could not generate a type that contains a compact type, because the Compact type path is not set in the settings.")]
     CompactPathNone,
+    /// Could not generate a type that contains a bit sequence, because the DecodedBits type path is not set in the settings.
     #[error("Could not generate a type that contains a bit sequence, because the DecodedBits type path is not set in the settings.")]
     DecodedBitsPathNone,
+    /// Could not find type with ID in the type registry.
     #[error("Could not find type with ID {0} in the type registry.")]
     TypeNotFound(u32),
+    /// Type substitution error.
     #[error("Type substitution error: {0}")]
     InvalidSubstitute(#[from] TypeSubstitutionError),
 }
@@ -22,7 +30,9 @@ pub enum TypegenError {
 /// Error attempting to do type substitution.
 #[derive(Debug, thiserror::Error)]
 pub struct TypeSubstitutionError {
+    /// Where in the code the error occured.
     pub span: Span,
+    /// Kind of TypeSubstitutionError that happended.
     pub kind: TypeSubstitutionErrorKind,
 }
 
@@ -35,6 +45,7 @@ impl std::fmt::Display for TypeSubstitutionError {
     }
 }
 
+/// Error attempting to do type substitution.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum TypeSubstitutionErrorKind {

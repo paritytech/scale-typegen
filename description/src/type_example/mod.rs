@@ -1,8 +1,7 @@
-mod rust_type;
-mod scale_value;
-
-pub use rust_type::rust_type_example;
-pub use scale_value::scale_value_example;
+/// Generate an exemplary rust value of some type
+pub mod rust_value;
+/// Generate an exemplary scale value of some type
+pub mod scale_value;
 
 #[cfg(test)]
 mod tests {
@@ -10,9 +9,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use scale_info::{PortableRegistry, TypeInfo};
 
-    use crate::type_example::scale_value::scale_value_example_from_seed;
-
-    use super::scale_value_example;
+    use crate::{scale_value, scale_value_from_seed};
 
     fn make_type<T: TypeInfo + 'static>() -> (u32, PortableRegistry) {
         let mut registry = scale_info::Registry::new();
@@ -34,7 +31,7 @@ mod tests {
         }
         let (id, types) = make_type::<Human>();
         // Make sure recursion does not panic. An error should be yielded instead.
-        assert!(scale_value_example(id, &types).is_err());
+        assert!(scale_value(id, &types).is_err());
     }
 
     #[test]
@@ -58,11 +55,11 @@ mod tests {
 
         let (id, types) = make_type::<Human>();
 
-        let a1 = scale_value_example_from_seed(id, &types, 20).unwrap();
-        let a2 = scale_value_example_from_seed(id, &types, 20).unwrap();
-        let a3 = scale_value_example_from_seed(id, &types, 20).unwrap();
-        let b1 = scale_value_example_from_seed(id, &types, 30).unwrap();
-        let b2 = scale_value_example_from_seed(id, &types, 30).unwrap();
+        let a1 = scale_value_from_seed(id, &types, 20).unwrap();
+        let a2 = scale_value_from_seed(id, &types, 20).unwrap();
+        let a3 = scale_value_from_seed(id, &types, 20).unwrap();
+        let b1 = scale_value_from_seed(id, &types, 30).unwrap();
+        let b2 = scale_value_from_seed(id, &types, 30).unwrap();
 
         // The examples can be checked manually by comparing them side by side:
         // println!("{b2}\n{a1}");

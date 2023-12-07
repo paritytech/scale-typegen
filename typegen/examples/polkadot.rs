@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
+use parity_scale_codec::Decode;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use scale_info::PortableRegistry;
 use scale_typegen::{TypeGenerator, TypeGeneratorSettings};
-use serde_json::Value;
 use syn::parse_quote;
 
 #[allow(unused)]
@@ -14,13 +14,14 @@ pub struct DecodedBits<Store, Order> {
 }
 
 /// This example shows how to use metadata from a polkadot node to generate rust types.
-///
-/// Some types might need
 pub fn main() {
-    let type_registry = read_registry_from_json();
+    let type_registry = read_registry_from_scale_metadata();
     let settings = TypeGeneratorSettings::default()
         .type_mod_name("my_types")
-        .decoded_bits_type_path(parse_quote!(DecodedBits));
+        .decoded_bits_type_path(parse_quote!(DecodedBits))
+        .compact_as_type_path(parse_quote!(parity_scale_codec::CompactAs))
+        .compact_type_path(parse_quote!(parity_scale_codec::Compact))
+        .add_derives_for_all([parse_quote!(Debug), parse_quote!(Clone)]);
 
     let type_generator = TypeGenerator::new(&type_registry, &settings);
     let code = type_generator
@@ -28,22 +29,19 @@ pub fn main() {
         .unwrap()
         .to_token_stream();
 
-    write_pretty_tokens(code, "./src/polkadot.rs");
+    write_pretty_tokens(code, "./artifacts/generated_polkadot.rs");
 }
 
-fn read_registry_from_json() -> PortableRegistry {
-    let json: Value =
-        serde_json::from_str(&std::fs::read_to_string("./artifacts/polkadot.json").unwrap())
-            .unwrap();
-    let types = json.as_array().unwrap()[1]
-        .as_object()
-        .unwrap()
-        .get("V15")
-        .unwrap()
-        .get("types")
-        .unwrap();
-    let registry: PortableRegistry = serde_json::from_value(types.clone()).unwrap();
-    registry
+fn read_registry_from_scale_metadata() -> PortableRegistry {
+    let bytes = std::fs::read("./artifacts/polkadot_metadata.scale")
+        .expect("File polkadot_metadata not found!");
+    let metadata = frame_metadata::RuntimeMetadataPrefixed::decode(&mut &bytes[..])
+        .expect("Metadata decoding failed");
+    match metadata.1 {
+        frame_metadata::RuntimeMetadata::V14(m) => m.types,
+        frame_metadata::RuntimeMetadata::V15(m) => m.types,
+        _ => panic!("Metadata too old, needs to be V14 or V15"),
+    }
 }
 
 fn write_pretty_tokens(tokens: TokenStream, path: &str) {
