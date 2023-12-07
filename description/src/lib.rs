@@ -95,7 +95,7 @@ mod tests {
                 corners: u8,
                 radius: u64,
             },
-            MultiShape {
+            Multi {
                 shapes: Vec<Shape<u64>>,
                 t: T,
                 operation: Operation,
@@ -122,7 +122,7 @@ mod tests {
                     corners: u8,
                     radius: u64
                 },
-                MultiShape {
+                Multi {
                     shapes: Vec<
                         enum Shape {
                             Inivisible,
@@ -132,7 +132,7 @@ mod tests {
                                 corners: u8,
                                 radius: u64
                             },
-                            MultiShape {
+                            Multi {
                                 shapes: Vec<Shape>,
                                 t: u64,
                                 operation: enum Operation {
@@ -144,11 +144,7 @@ mod tests {
                         }
                     >,
                     t: u8,
-                    operation: enum Operation {
-                        Add,
-                        Intersect,
-                        Difference
-                    }
+                    operation: Operation
                 }
             }"}
         );
@@ -191,27 +187,132 @@ mod tests {
     fn recursive_containers() {
         #[allow(unused)]
         #[derive(TypeInfo)]
-        struct Container {
-            shapes: Vec<S>,
+        struct A {
+            bees: Vec<B>,
         }
 
         #[allow(unused)]
         #[derive(TypeInfo)]
-        struct S {
-            u: u8,
-            others: Vec<S>,
+        struct B {
+            id: u8,
+            others: Vec<B>,
         }
 
-        let (type_id, type_registry) = make_type::<Container>();
+        let (type_id, type_registry) = make_type::<A>();
 
         assert_eq!(
             type_description(type_id, &type_registry, true).unwrap(),
             indoc! {
-            "struct Container {
-                shapes: Vec<struct S {
-                    u: u8,
-                    others: Vec<S>
-                }>
+            "struct A {
+                bees: Vec<
+                    struct B {
+                        id: u8,
+                        others: Vec<B>
+                    }
+                >
+            }"}
+        );
+    }
+
+    #[test]
+    fn recursive_generics() {
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct Vec2<C> {
+            x: Box<C>,
+            y: Box<C>,
+        }
+
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct A {
+            bees: Vec2<B>,
+        }
+
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct B {
+            id: u8,
+            others: Vec2<B>,
+        }
+
+        let (type_id, type_registry) = make_type::<A>();
+
+        assert_eq!(
+            type_description(type_id, &type_registry, true).unwrap(),
+            indoc! {
+            "struct A {
+                bees: struct Vec2 {
+                    x: Box<
+                        struct B {
+                            id: u8,
+                            others: Vec2
+                        }
+                    >,
+                    y: Box<B>
+                }
+            }"}
+        );
+    }
+
+    #[test]
+    fn multiple_fields_with_same_type() {
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct A {
+            x: B,
+            y: B,
+            z: B,
+        }
+
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct B {
+            id: u8,
+        }
+
+        let (type_id, type_registry) = make_type::<A>();
+
+        assert_eq!(
+            type_description(type_id, &type_registry, true).unwrap(),
+            indoc! {
+            "struct A {
+                x: struct B {
+                    id: u8
+                },
+                y: B,
+                z: B
+            }"}
+        );
+    }
+
+    #[test]
+    fn tuple_fields_with_same_type() {
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct A {
+            tup: (B, B, B),
+        }
+
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct B {
+            id: u8,
+        }
+
+        let (type_id, type_registry) = make_type::<A>();
+
+        assert_eq!(
+            type_description(type_id, &type_registry, true).unwrap(),
+            indoc! {
+            "struct A {
+                tup: (
+                    struct B {
+                        id: u8
+                    },
+                    B,
+                    B
+                )
             }"}
         );
     }

@@ -1,9 +1,12 @@
-use crate::{Derives, TypegenError};
+use crate::TypegenError;
 
 use self::{
     ir::module_ir::ModuleIR,
     ir::type_ir::{CompositeFieldIR, CompositeIR, CompositeIRKind, EnumIR, TypeIR, TypeIRKind},
-    settings::{derives::FlatDerivesRegistry, TypeGeneratorSettings},
+    settings::{
+        derives::{Derives, FlatDerivesRegistry},
+        TypeGeneratorSettings,
+    },
     type_params::TypeParameters,
     type_path::TypeParameter,
 };
@@ -262,11 +265,6 @@ impl<'a> TypeGenerator<'a> {
             insert_codec_attributes: self.settings.insert_codec_attributes,
             kind: TypeIRKind::Struct(composite.clone()),
         }
-    }
-
-    /// The default derives set in the type generator's settings.
-    pub fn default_derives(&self) -> &Derives {
-        self.settings.derives.default_derives()
     }
 
     /// Adds a AsCompact derive, if a path to AsCompact trait/derive macro set in settings.

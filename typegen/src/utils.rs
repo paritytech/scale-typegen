@@ -1,5 +1,4 @@
 use scale_info::{form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeParameter};
-use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
 
 use crate::TypegenError;
@@ -13,59 +12,58 @@ pub fn syn_type_path(ty: &Type<PortableForm>) -> Result<syn::TypePath, TypegenEr
 
 /// Deduplicates type paths in the provided Registry.
 pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
-    let mut types_with_same_type_path = HashMap::<&[String], SmallVec<[u32; 2]>>::new();
+    let mut types_with_same_type_path_grouped_by_shape = HashMap::<&[String], Vec<Vec<u32>>>::new();
 
-    // Figure out which types have the same type paths by storing them in the HashMap
-    for ty in types.types.iter() {
+    // First, group types if they are similar (same path, same shape).
+
+    for (ty_id, ty) in types.types.iter().enumerate() {
         // Ignore types without a path (i.e prelude types).
         if ty.ty.path.namespace().is_empty() {
             continue;
         };
-        types_with_same_type_path
+
+        // get groups that share this path already, if any.
+        let groups_with_same_path = types_with_same_type_path_grouped_by_shape
             .entry(&ty.ty.path.segments)
-            .or_default()
-            .push(ty.id);
-    }
+            .or_default();
 
-    let clashing_type_ids = types_with_same_type_path
-        .into_iter()
-        .filter_map(|(_, v)| (v.len() > 1).then_some(v));
-
-    // submit to this buffer type ids (u32), where a number (usize) should be added to the type path to distinguish them.
-    let mut renaming_commands: Vec<(u32, usize)> = vec![];
-
-    for type_ids in clashing_type_ids {
-        // Map N types in type_ids to M new type paths, where M <= N.
-        // types with the same structure should map to the same type path after all.
-        let mut types_with_same_structure: Vec<(&Type<PortableForm>, SmallVec<[u32; 2]>)> = vec![];
-        'outer: for id in type_ids {
-            let type_a = types.resolve(id).expect("type is present; qed;");
-            for (type_b, ids) in types_with_same_structure.iter_mut() {
-                if types_equal_extended_to_params(type_a, type_b) {
-                    ids.push(id);
-                    continue 'outer;
-                }
+        // Compare existing groups to check which to add our type ID to.
+        let mut added_to_existing_group = false;
+        for group in groups_with_same_path.iter_mut() {
+            let ty_id_b = group[0]; // all types in group are same shape; just check any one of them.
+            let ty_b = types.resolve(ty_id_b).expect("ty exists");
+            if types_equal_extended_to_params(&ty.ty, ty_b) {
+                group.push(ty_id_b);
+                added_to_existing_group = true;
+                break;
             }
-            types_with_same_structure.push((type_a, smallvec![id]));
         }
 
-        // Now that the types that share a structure are grouped together, we can order commands to rename them.
-        for (n, (_, group)) in types_with_same_structure.iter().enumerate() {
-            for id in group {
-                renaming_commands.push((*id, n + 1));
-            }
+        // We didn't find a matching group, so add it to a new one.
+        if !added_to_existing_group {
+            groups_with_same_path.push(vec![ty_id as u32])
         }
     }
 
-    // execute the actual renaming. The `get_mut()` with the usize cast is a bit awkward, but there is currently not `resolve_mut()` function on the `PortableRegistry`.
-    for (id, appendix) in renaming_commands {
-        let ty = types
-            .types
-            .get_mut(id as usize)
-            .expect("type is present; qed;");
-        assert_eq!(ty.id, id);
-        let name = ty.ty.path.segments.last_mut().expect("This is only empty for builtin types, that are filtered out with namespace().is_empty() above; qed;");
-        *name = format!("{name}{appendix}"); // e.g. Header1, Header2, Header3, ...
+    // Now, rename types as needed based on these groups.
+    let groups_that_need_renaming = types_with_same_type_path_grouped_by_shape
+        .into_values()
+        .filter(|g| g.len() > 1)
+        .collect::<Vec<_>>(); // Collect necessary because otherwise types is borrowed immutably and cannot be modified.
+
+    for groups_with_same_path in groups_that_need_renaming {
+        let mut n = 1;
+        for group_with_same_shape in groups_with_same_path {
+            for ty_id in group_with_same_shape {
+                let ty = types
+                    .types
+                    .get_mut(ty_id as usize)
+                    .expect("type is present; qed;");
+                let name = ty.ty.path.segments.last_mut().expect("This is only empty for builtin types, that are filtered out with namespace().is_empty() above; qed;");
+                *name = format!("{name}{n}"); // e.g. Header1, Header2, Header3, ...
+            }
+            n += 1;
+        }
     }
 }
 
@@ -93,6 +91,10 @@ fn types_equal_extended_to_params(a: &Type<PortableForm>, b: &Type<PortableForm>
 
     let type_params_a = collect_params(&a.type_params);
     let type_params_b = collect_params(&a.type_params);
+
+    if type_params_a.len() != type_params_b.len() {
+        return false;
+    }
 
     // returns true if the ids are the same OR if they point to the same generic parameter.
     let ids_equal = |a: u32, b: u32| -> bool {

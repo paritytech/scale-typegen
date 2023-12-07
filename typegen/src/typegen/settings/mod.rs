@@ -106,8 +106,11 @@ impl TypeGeneratorSettings {
     }
 
     /// Adds some derives for all types.
-    pub fn derive_on_all(mut self, derive_paths: impl IntoIterator<Item = syn::Path>) -> Self {
-        self.derives.extend_for_all(derive_paths, []);
+    pub fn add_derives_for_all(
+        mut self,
+        derive_paths: impl IntoIterator<Item = syn::Path>,
+    ) -> Self {
+        self.derives.add_derives_for_all(derive_paths);
         self
     }
 }

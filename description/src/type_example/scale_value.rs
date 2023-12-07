@@ -23,13 +23,30 @@ pub fn example_from_seed(id: u32, types: &PortableRegistry, seed: u64) -> anyhow
         _type_id: u32,
         ty: &Type<PortableForm>,
         _transformer: &ValueTransformer,
-    ) -> anyhow::Result<Value> {
-        Err(anyhow!(
+    ) -> Option<anyhow::Result<Value>> {
+        Some(Err(anyhow!(
             "Cannot generate scale value example for recursive type: {ty:?}"
-        ))
+        )))
     }
+
+    /// Note: because None is returned here, the transformer will just continue its work.
+    fn compute_another_example(
+        _type_id: u32,
+        _ty: &Type<PortableForm>,
+        _cached_value: &Value,
+        _transformer: &ValueTransformer,
+    ) -> Option<anyhow::Result<Value>> {
+        None
+    }
+
     let state = RefCell::new(rand_chacha::ChaCha8Rng::seed_from_u64(seed));
-    let transformer = ValueTransformer::new(ty_example, error_on_recurse, state, types);
+    let transformer = ValueTransformer::new(
+        ty_example,
+        error_on_recurse,
+        compute_another_example,
+        state,
+        types,
+    );
     transformer.resolve(id)
 }
 
@@ -50,7 +67,7 @@ fn ty_example(
         TypeDef::Variant(variant) => {
             let random_variant = variant
                 .variants
-                .choose(&mut *transformer.state.borrow_mut())
+                .choose(&mut *transformer.state().borrow_mut())
                 .ok_or_else(|| anyhow!("Variant type should have at least one variant"))?;
             let fields = random_variant
                 .fields
@@ -87,12 +104,12 @@ fn ty_example(
         }
         TypeDef::Primitive(primitive) => Ok(primitive_type_def_example(
             primitive,
-            &mut *transformer.state.borrow_mut(),
+            &mut *transformer.state().borrow_mut(),
         )),
         TypeDef::Compact(compact) => transformer.resolve(compact.type_param.id),
         TypeDef::BitSequence(_) => {
             let mut bit_sequence = BitSequence::new();
-            let rng = &mut *transformer.state.borrow_mut();
+            let rng = &mut *transformer.state().borrow_mut();
             for _ in 0..rng.gen_range(3..7) {
                 bit_sequence.push(rng.gen());
             }

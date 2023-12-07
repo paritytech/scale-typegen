@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use scale_info::{
     form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeDefArray, TypeDefBitSequence,
     TypeDefCompact, TypeDefPrimitive, TypeDefSequence, TypeDefTuple, TypeDefVariant, Variant,
@@ -19,20 +18,32 @@ pub fn type_description(
     type_registry: &PortableRegistry,
     format: bool,
 ) -> anyhow::Result<String> {
-    fn return_type_name_on_recurse(
+    fn return_type_name(
         _type_id: u32,
         ty: &Type<PortableForm>,
         _transformer: &Transformer<String>,
-    ) -> anyhow::Result<String> {
+    ) -> Option<anyhow::Result<String>> {
         if let Some(type_name) = ty.path.ident() {
-            return Ok(type_name);
+            return Some(Ok(type_name));
         }
-        Err(anyhow!("Recursive type that did not get handled properly"))
+        None
     }
 
+    fn return_type_name_on_cache_hit(
+        _type_id: u32,
+        ty: &Type<PortableForm>,
+        cached: &String,
+        _transformer: &Transformer<String>,
+    ) -> Option<anyhow::Result<String>> {
+        if let Some(type_name) = ty.path.ident() {
+            return Some(Ok(type_name));
+        }
+        Some(Ok(cached.to_owned()))
+    }
     let transformer = Transformer::new(
         ty_description,
-        return_type_name_on_recurse,
+        return_type_name,
+        return_type_name_on_cache_hit,
         (),
         type_registry,
     );
@@ -64,7 +75,6 @@ fn type_def_type_description(
 ) -> anyhow::Result<String> {
     match type_def {
         TypeDef::Composite(composite) => fields_type_description(&composite.fields, transformer),
-
         TypeDef::Variant(variant) => variant_type_def_type_description(variant, transformer),
         TypeDef::Sequence(sequence) => sequence_type_description(sequence, transformer),
         TypeDef::Array(array) => array_type_description(array, transformer),
@@ -83,10 +93,11 @@ fn tuple_type_description(
 ) -> anyhow::Result<String> {
     let mut output = "(".to_string();
     let mut iter = tuple.fields.iter().peekable();
+    let field_count = tuple.fields.len();
     while let Some(ty) = iter.next() {
         let type_description = transformer.resolve(ty.id)?;
         output.push_str(&type_description);
-        if iter.peek().is_some() {
+        if iter.peek().is_some() || field_count == 1 {
             output.push(',')
         }
     }
@@ -221,7 +232,6 @@ fn field_type_description(
     transformer: &Transformer<String>,
 ) -> anyhow::Result<String> {
     let mut type_description = transformer.resolve(field.ty.id)?;
-
     let is_boxed = field
         .type_name
         .as_ref()
