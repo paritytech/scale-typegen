@@ -8,11 +8,14 @@ use syn::parse_quote;
 use crate::{
     tests::utils::{subxt_settings, Testgen},
     typegen::{
-        error::SettingsValidationError, settings::TypeGeneratorSettings,
-        validate_settings::similar_type_paths_in_registry,
+        error::SettingsValidationError,
+        settings::TypeGeneratorSettings,
+        validation::{
+            similar_type_paths_in_registry, validate_substitutes_and_derives_against_registry,
+        },
     },
     utils::ensure_unique_type_paths,
-    DerivesRegistry, TypeGenerator, TypeSubstitutes,
+    DerivesRegistry, TypeSubstitutes,
 };
 
 mod utils;
@@ -1309,8 +1312,12 @@ fn validation_errors() {
             parse_quote!(::hello::T),
         );
 
-    let type_gen = TypeGenerator::new(&registry, &settings);
-    let err = type_gen.validate().unwrap_err();
+    let err = validate_substitutes_and_derives_against_registry(
+        &settings.substitutes,
+        &settings.derives,
+        &registry,
+    )
+    .unwrap_err();
     // we expect only errors for type T because S is in the registry, T is not.
     let expected_err = SettingsValidationError {
         derives_for_unknown_types: vec![(
