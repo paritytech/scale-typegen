@@ -1318,6 +1318,7 @@ fn validation_errors() {
         &registry,
     )
     .unwrap_err();
+
     // we expect only errors for type T because S is in the registry, T is not.
     let expected_err = SettingsValidationError {
         derives_for_unknown_types: vec![(

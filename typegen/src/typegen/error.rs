@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use proc_macro2::Span;
+use quote::ToTokens;
 
 /// Error for when something went wrong during type generation.
 #[derive(Debug, thiserror::Error)]
@@ -85,19 +86,68 @@ pub struct SettingsValidationError {
     pub substitutes_for_unknown_types: Vec<(syn::Path, syn::Path)>,
 }
 
-impl SettingsValidationError {
-    pub(crate) fn is_empty(&self) -> bool {
-        self.derives_for_unknown_types.is_empty()
-            && self.attributes_for_unknown_types.is_empty()
-            && self.substitutes_for_unknown_types.is_empty()
-    }
-}
-
 impl std::fmt::Display for SettingsValidationError {
     fn fmt(
         &self,
         f: &mut scale_info::prelude::fmt::Formatter<'_>,
     ) -> scale_info::prelude::fmt::Result {
-        f.write_fmt(format_args!("{:?}", self))
+        fn display_one(e: &impl ToTokens) -> String {
+            e.to_token_stream().to_string().replace(' ', "")
+        }
+
+        fn display_many(set: &HashSet<impl ToTokens>) -> String {
+            set.iter()
+                .map(|e| display_one(e))
+                .collect::<Vec<_>>()
+                .join(", ")
+        }
+
+        writeln!(f, "Settings validation error:")?;
+
+        if !self.derives_for_unknown_types.is_empty() {
+            writeln!(f, "  Derives for unknown types:")?;
+            for (path, derives) in &self.derives_for_unknown_types {
+                writeln!(
+                    f,
+                    "    {} (Derives: {})",
+                    display_one(path),
+                    display_many(derives)
+                )?;
+            }
+        }
+
+        if !self.attributes_for_unknown_types.is_empty() {
+            writeln!(f, "  Attributes for unknown types:")?;
+            for (path, attributes) in &self.attributes_for_unknown_types {
+                writeln!(
+                    f,
+                    "    {} (Attributes: {})",
+                    display_one(path),
+                    display_many(attributes)
+                )?;
+            }
+        }
+
+        if !self.substitutes_for_unknown_types.is_empty() {
+            writeln!(f, "  Substitutes for unknown types:")?;
+            for (original, substitute) in &self.substitutes_for_unknown_types {
+                writeln!(
+                    f,
+                    "    {} (Substitute: {})",
+                    display_one(original),
+                    display_one(substitute),
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl SettingsValidationError {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.derives_for_unknown_types.is_empty()
+            && self.attributes_for_unknown_types.is_empty()
+            && self.substitutes_for_unknown_types.is_empty()
     }
 }
