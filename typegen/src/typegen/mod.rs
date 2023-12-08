@@ -284,10 +284,6 @@ impl<'a> TypeGenerator<'a> {
     /// ```
     ///
     /// This allows generating the correct generic field type paths.
-    ///
-    /// # Panics
-    ///
-    /// If no type with the given id found in the type registry.
     pub fn resolve_field_type_path(
         &self,
         id: u32,
@@ -298,10 +294,6 @@ impl<'a> TypeGenerator<'a> {
     }
 
     /// Get the type path for the given type identifier.
-    ///
-    /// # Panics
-    ///
-    /// If no type with the given id found in the type registry.
     pub fn resolve_type_path(&self, id: u32) -> Result<TypePath, TypegenError> {
         self.resolve_type_path_recurse(id, false, &[], None)
     }
