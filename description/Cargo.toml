@@ -2,11 +2,10 @@
 name = "scale-typegen-description"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-
-# define the default features:
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/paritytech/scale-typegen"
+description = "Type Description and Examples for SCALE encoded Rust Types"
 
 [features]
 default = ["type-example"]
