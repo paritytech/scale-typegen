@@ -20,7 +20,7 @@
 
 mod description;
 mod formatting;
-mod transformer;
+pub mod transformer;
 
 #[cfg(feature = "type-example")]
 pub use scale_typegen;

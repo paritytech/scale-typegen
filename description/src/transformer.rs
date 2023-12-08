@@ -1,3 +1,4 @@
+//! Providing an abstraction for transforming type registries.
 use std::{cell::RefCell, collections::HashMap};
 
 use scale_info::{form::PortableForm, PortableRegistry, Type};
