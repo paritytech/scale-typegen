@@ -7,7 +7,13 @@ use syn::parse_quote;
 
 use crate::{
     tests::utils::{subxt_settings, Testgen},
-    typegen::settings::TypeGeneratorSettings,
+    typegen::{
+        error::SettingsValidationError,
+        settings::TypeGeneratorSettings,
+        validation::{
+            similar_type_paths_in_registry, validate_substitutes_and_derives_against_registry,
+        },
+    },
     utils::ensure_unique_type_paths,
     DerivesRegistry, TypeSubstitutes,
 };
@@ -1259,4 +1265,114 @@ fn ensure_unique_type_paths_test() {
             "scale_typegen::tests::Header3",
         ]
     );
+}
+
+#[test]
+fn validation_errors() {
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct S;
+
+    let registry = Testgen::new().with::<S>().into_portable_registry();
+    let mut settings = TypeGeneratorSettings::new();
+    settings.derives = {
+        let mut d = DerivesRegistry::new();
+        d.add_derives_for(
+            parse_quote!(scale_typegen::tests::S),
+            [parse_quote!(Clone), parse_quote!(Reflect)],
+            true,
+        );
+
+        d.add_attributes_for(
+            parse_quote!(scale_typegen::tests::S),
+            [parse_quote!(#[nice])],
+            true,
+        );
+
+        d.add_derives_for(
+            parse_quote!(scale_typegen::tests::T),
+            [parse_quote!(Clone), parse_quote!(Reflect)],
+            true,
+        );
+
+        d.add_attributes_for(
+            parse_quote!(scale_typegen::tests::T),
+            [parse_quote!(#[nice])],
+            true,
+        );
+        d
+    };
+    settings = settings
+        .substitute(
+            parse_quote!(scale_typegen::tests::S),
+            parse_quote!(::hello::S),
+        )
+        .substitute(
+            parse_quote!(scale_typegen::tests::T),
+            parse_quote!(::hello::T),
+        );
+
+    let err = validate_substitutes_and_derives_against_registry(
+        &settings.substitutes,
+        &settings.derives,
+        &registry,
+    )
+    .unwrap_err();
+
+    // we expect only errors for type T because S is in the registry, T is not.
+    let expected_err = SettingsValidationError {
+        derives_for_unknown_types: vec![(
+            parse_quote!(scale_typegen::tests::T),
+            [parse_quote!(Clone), parse_quote!(Reflect)].into(),
+        )],
+        attributes_for_unknown_types: vec![(
+            parse_quote!(scale_typegen::tests::T),
+            [parse_quote!(#[nice])].into(),
+        )],
+        substitutes_for_unknown_types: vec![(
+            parse_quote!(scale_typegen::tests::T),
+            parse_quote!(::hello::T),
+        )],
+    };
+
+    assert_eq!(err, expected_err);
+}
+
+#[test]
+fn find_similar_type_paths() {
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct S;
+    mod types {
+        #[allow(unused)]
+        #[derive(scale_info::TypeInfo)]
+        pub struct T;
+
+        #[allow(unused)]
+        #[derive(scale_info::TypeInfo)]
+        pub struct S;
+
+        pub mod abc {
+            #[allow(unused)]
+            #[derive(scale_info::TypeInfo)]
+            pub struct S;
+        }
+    }
+
+    let registry = Testgen::new()
+        .with::<S>()
+        .with::<types::S>()
+        .with::<types::T>()
+        .with::<types::abc::S>()
+        .into_portable_registry();
+
+    // user gives the wrong type location types::xyz::S => show them suggestions for correct paths.
+    let similar = similar_type_paths_in_registry(&registry, &parse_quote!(types::xyz::S));
+
+    let expected: Vec<syn::Path> = vec![
+        parse_quote!(scale_typegen::tests::S),
+        parse_quote!(scale_typegen::tests::types::S),
+        parse_quote!(scale_typegen::tests::types::abc::S),
+    ];
+    assert_eq!(similar, expected);
 }
