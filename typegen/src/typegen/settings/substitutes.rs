@@ -18,8 +18,14 @@ fn error(span: Span, kind: TypeSubstitutionErrorKind) -> TypeSubstitutionError {
 /// to figure out when to swap said type with some provided substitute.
 #[derive(Debug, Clone)]
 pub struct TypeSubstitutes {
-    substitutes: HashMap<syn::Path, Substitute>,
+    substitutes: HashMap<PathSegments, Substitute>,
 }
+
+/// We use this `Vec<String>` as a common denominator, since we need a consistent key for both
+/// `syn::TypePath` and `scale_info::ty::path::Path` types.
+///
+/// Can be obtained from a [`syn::Path`] via the [`path_segments`] function.
+pub type PathSegments = Vec<String>;
 
 /// A type that substitutes another type.
 #[derive(Debug, Clone)]
@@ -97,8 +103,9 @@ impl TypeSubstitutes {
     fn parse_path_substitution(
         src_path: syn::Path,
         target_path: syn::Path,
-    ) -> Result<(syn::Path, Substitute), TypeSubstitutionError> {
+    ) -> Result<(PathSegments, Substitute), TypeSubstitutionError> {
         let param_mapping = Self::parse_path_param_mapping(&src_path, &target_path)?;
+        let src_path = path_segments(&src_path);
         Ok((
             src_path,
             Substitute {
@@ -192,18 +199,15 @@ impl TypeSubstitutes {
     }
 
     /// Given a source type path, return whether a substitute exists for it.
-    pub fn contains(&self, path: impl TryIntoSynPath) -> bool {
-        let Some(syn_path) = path.syn_path() else {
-            return false;
-        };
-        self.substitutes.contains_key(&syn_path)
+    pub fn contains(&self, path: &PathSegments) -> bool {
+        !path.is_empty() && self.substitutes.contains_key(path)
     }
 
     /// Given a source type path and the resolved, supplied type parameters,
     /// return a new path and optionally overwritten type parameters.
     pub fn for_path_with_params(
         &self,
-        path: impl TryIntoSynPath,
+        path: &PathSegments,
         params: &[TypePath],
     ) -> Option<TypePathType> {
         // If we find a substitute type, we'll take the substitute path, and
@@ -241,14 +245,13 @@ impl TypeSubstitutes {
             }
         }
 
-        let path = path.syn_path()?;
         self.substitutes
-            .get(&path)
+            .get(path)
             .map(|sub| replace_params(sub.path.clone(), params, &sub.param_mapping))
     }
 
     /// Returns an iterator over all substitutes.
-    pub fn iter(&self) -> impl Iterator<Item = (&syn::Path, &Substitute)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&PathSegments, &Substitute)> {
         self.substitutes.iter()
     }
 }
@@ -348,6 +351,11 @@ fn is_absolute(path: &syn::Path) -> bool {
 /// tries to convert a [`syn::Path`] into an `AbsolutePath`. Only succeeds if the path is not a relative path.
 pub fn absolute_path(path: syn::Path) -> Result<AbsolutePath, TypeSubstitutionError> {
     path.try_into()
+}
+
+/// Converts a [`syn::Path`] into a `Vec<String>` that contains all the [`syn::Ident`]s of the path as strings.
+pub fn path_segments(path: &syn::Path) -> PathSegments {
+    path.segments.iter().map(|x| x.ident.to_string()).collect()
 }
 
 /// New-type trait for `TryInto<syn::Path>`

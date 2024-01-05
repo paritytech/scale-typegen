@@ -1,8 +1,12 @@
 use scale_info::{form::PortableForm, PortableRegistry};
+use syn::parse_quote;
 
 use crate::{DerivesRegistry, TypeSubstitutes};
 
-use super::{error::SettingsValidationError, settings::substitutes::TryIntoSynPath};
+use super::{
+    error::SettingsValidationError,
+    settings::substitutes::{path_segments, PathSegments, TryIntoSynPath},
+};
 
 /// Validates that the settings given are valid for the type registry.
 /// It checks for all type specific derives, attributes and substitutes if these types really exist in the type registry.
@@ -17,7 +21,8 @@ pub fn validate_substitutes_and_derives_against_registry(
     let mut error = SettingsValidationError::default();
 
     for (path, derives_and_attrs) in derives.derives_on_specific_types() {
-        if !registry_contains_type_path(types, &path.path) {
+        let path_segments = path_segments(&path.path);
+        if !registry_contains_type_path(types, &path_segments) {
             let attributes = derives_and_attrs.attributes();
             let derives = derives_and_attrs.derives();
 
@@ -55,7 +60,7 @@ pub fn validate_substitutes_and_derives_against_registry(
         if !registry_contains_type_path(types, path) {
             error
                 .substitutes_for_unknown_types
-                .push((path.clone(), sub.path().clone()))
+                .push((path_segments_to_syn_path(path), sub.path().clone()))
         }
     }
 
@@ -66,12 +71,25 @@ pub fn validate_substitutes_and_derives_against_registry(
     }
 }
 
+/// Converts a `Vec<String>` into a [`syn::Path`]. Returns None if the Vec was empty.
+///
+/// # Panics
+///
+/// Panics if the segments are empty or contain strings that are not valid [`syn::path::PathSegment`]s.
+fn path_segments_to_syn_path(segments: &PathSegments) -> syn::Path {
+    if segments.is_empty() {
+        panic!("Path in Substitutes should not be empty.")
+    }
+    let segments = segments.iter().map(|e| {
+        syn::parse_str::<syn::PathSegment>(e)
+            .expect("PathSegments should be syn::PathSegment compatible")
+    });
+    parse_quote!(#(#segments)::*)
+}
+
 /// Checks if a given type path is the type path of a type in the registry.
-pub fn registry_contains_type_path(types: &PortableRegistry, path: &syn::Path) -> bool {
-    let scale_type_path = scale_info::Path::<PortableForm> {
-        segments: path.segments.iter().map(|e| e.ident.to_string()).collect(),
-    };
-    types.types.iter().any(|t| t.ty.path == scale_type_path)
+pub fn registry_contains_type_path(types: &PortableRegistry, path: &[String]) -> bool {
+    types.types.iter().any(|t| t.ty.path.segments == *path)
 }
 
 /// Returns types in the PortableRegistry that share the identifier with the input path.
