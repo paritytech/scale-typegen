@@ -358,22 +358,6 @@ pub fn path_segments(path: &syn::Path) -> PathSegments {
     path.segments.iter().map(|x| x.ident.to_string()).collect()
 }
 
-/// Converts a `Vec<String>` into a [`syn::Path`]. Returns None if the Vec was empty.
-///
-/// # Panics
-///
-/// Panics if the segments contain strings that are not valid [`syn::path::PathSegment`]s.
-pub fn path_segments_to_syn_path(segments: &PathSegments) -> Option<syn::Path> {
-    if segments.is_empty() {
-        return None;
-    }
-    let segments = segments.iter().map(|e| {
-        syn::parse_str::<PathSegment>(e)
-            .expect("PathSegments should be syn::PathSegment compatible")
-    });
-    Some(parse_quote!(#(#segments)::*))
-}
-
 /// New-type trait for `TryInto<syn::Path>`
 pub trait TryIntoSynPath {
     /// Turns the type into a [`syn::Path`]. Returns None for empty paths.

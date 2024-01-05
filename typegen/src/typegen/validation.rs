@@ -1,10 +1,11 @@
 use scale_info::{form::PortableForm, PortableRegistry};
+use syn::parse_quote;
 
 use crate::{DerivesRegistry, TypeSubstitutes};
 
 use super::{
     error::SettingsValidationError,
-    settings::substitutes::{path_segments, path_segments_to_syn_path, TryIntoSynPath},
+    settings::substitutes::{path_segments, PathSegments, TryIntoSynPath},
 };
 
 /// Validates that the settings given are valid for the type registry.
@@ -57,10 +58,9 @@ pub fn validate_substitutes_and_derives_against_registry(
 
     for (path, sub) in substitutes.iter() {
         if !registry_contains_type_path(types, path) {
-            error.substitutes_for_unknown_types.push((
-                path_segments_to_syn_path(path).expect("Path in Substitutes should not be empty."),
-                sub.path().clone(),
-            ))
+            error
+                .substitutes_for_unknown_types
+                .push((path_segments_to_syn_path(path), sub.path().clone()))
         }
     }
 
@@ -71,8 +71,24 @@ pub fn validate_substitutes_and_derives_against_registry(
     }
 }
 
+/// Converts a `Vec<String>` into a [`syn::Path`]. Returns None if the Vec was empty.
+///
+/// # Panics
+///
+/// Panics if the segments are empty or contain strings that are not valid [`syn::path::PathSegment`]s.
+fn path_segments_to_syn_path(segments: &PathSegments) -> syn::Path {
+    if segments.is_empty() {
+        panic!("Path in Substitutes should not be empty.")
+    }
+    let segments = segments.iter().map(|e| {
+        syn::parse_str::<syn::PathSegment>(e)
+            .expect("PathSegments should be syn::PathSegment compatible")
+    });
+    parse_quote!(#(#segments)::*)
+}
+
 /// Checks if a given type path is the type path of a type in the registry.
-pub fn registry_contains_type_path(types: &PortableRegistry, path: &Vec<String>) -> bool {
+pub fn registry_contains_type_path(types: &PortableRegistry, path: &[String]) -> bool {
     types.types.iter().any(|t| t.ty.path.segments == *path)
 }
 
