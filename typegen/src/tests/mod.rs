@@ -21,6 +21,62 @@ use crate::{
 mod utils;
 
 #[test]
+fn substitutes_with_generics() {
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct A {
+        gen: Pair<u32, u64>,
+    }
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct Pair<T, R> {
+        t: T,
+        r: R,
+    }
+
+    // replace with other generic type
+    {
+        let settings = TypeGeneratorSettings::default()
+            .type_mod_name("my_types")
+            .substitute(
+                parse_quote!(::scale_typegen::tests::Pair<T, R>),
+                parse_quote!(crate::NewPair<T, R>),
+            );
+        let code = Testgen::new().with::<A>().gen_tests_mod(settings);
+        let expected_code = quote! {
+            pub mod tests {
+                use super::my_types;
+                pub struct A {
+                    pub gen: crate::NewPair<::core::primitive::u32, ::core::primitive::u64>,
+                }
+            }
+        };
+        assert_eq!(code.to_string(), expected_code.to_string());
+    }
+
+    // replace with fixed type
+    {
+        let settings = TypeGeneratorSettings::default()
+            .type_mod_name("my_types")
+            .substitute(
+                parse_quote!(::scale_typegen::tests::Pair<T, R>),
+                parse_quote!(crate::NewPair),
+            );
+        let code = Testgen::new().with::<A>().gen_tests_mod(settings);
+        let expected_code = quote! {
+            pub mod tests {
+                use super::my_types;
+                pub struct A {
+                    pub gen: crate::NewPair,
+                }
+            }
+        };
+        assert_eq!(code.to_string(), expected_code.to_string());
+    }
+}
+
+#[test]
 fn substitutes_and_derives() {
     // set up settings
     let settings = TypeGeneratorSettings::default()

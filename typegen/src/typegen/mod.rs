@@ -78,7 +78,7 @@ impl<'a> TypeGenerator<'a> {
             let path = &ty.ty.path;
             // Don't generate a type if it was substituted - the target type might
             // not be in the type registry + our resolution already performs the substitution.
-            if self.settings.substitutes.contains(path) {
+            if self.settings.substitutes.contains(&path.segments) {
                 continue;
             }
 
@@ -438,7 +438,11 @@ impl<'a> TypeGenerator<'a> {
         path: &scale_info::Path<PortableForm>,
         params: &[TypePath],
     ) -> TypePathType {
-        if let Some(substitute) = self.settings.substitutes.for_path_with_params(path, params) {
+        if let Some(substitute) = self
+            .settings
+            .substitutes
+            .for_path_with_params(&path.segments, params)
+        {
             substitute
         } else {
             TypePathType::from_type_def_path(
