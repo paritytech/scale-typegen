@@ -1,6 +1,10 @@
-# [0.2.0] - 2024-02-29
+# [0.2.0] - 2024-03-01
 
 - bumped dependencies of `scale-*` crates.
+
+# [0.1.2] - 2024-02-29 [YANKED]
+
+- dependency updates broke usage with subxt -> released 0.2.0 instead.
 
 # [0.1.1] - 2024-01-05
 
