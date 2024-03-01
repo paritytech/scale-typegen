@@ -1,4 +1,4 @@
-# [0.1.2] - 2024-02-29
+# [0.2.0] - 2024-02-29
 
 - bumped dependencies of `scale-*` crates.
 
