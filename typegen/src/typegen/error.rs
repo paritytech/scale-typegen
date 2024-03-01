@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use proc_macro2::Span;
 use quote::ToTokens;
+use scale_info::form::PortableForm;
 
 /// Error for when something went wrong during type generation.
 #[derive(Debug, thiserror::Error)]
@@ -31,6 +32,10 @@ pub enum TypegenError {
     /// The settings do not fit the given type registry.
     #[error("Settings do not fit the given type registry: {0}")]
     SettingsValidation(SettingsValidationError),
+    /// There are two types with the the same type path but a different structure.
+    /// Use [`crate::utils::ensure_unique_type_paths`] on your [`scale_info::PortableRegistry`] to deduplicate type paths.
+    #[error("There are two types with the the same type path {0} but different structure. Use `scale_typegen::utils::ensure_unique_type_paths` on your `PortableRegistry` before, to avoid this error.")]
+    DuplicateTypePath(String),
 }
 
 /// Error attempting to do type substitution.

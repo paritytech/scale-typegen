@@ -81,7 +81,10 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
 /// all type ids mentioned in the TypeDef are either:
 /// - equal
 /// - or different, but map essentially to the same generic type parameter
-fn types_equal_extended_to_params(a: &Type<PortableForm>, b: &Type<PortableForm>) -> bool {
+pub(crate) fn types_equal_extended_to_params(
+    a: &Type<PortableForm>,
+    b: &Type<PortableForm>,
+) -> bool {
     let collect_params = |type_params: &[TypeParameter<PortableForm>]| {
         type_params
             .iter()
@@ -90,12 +93,11 @@ fn types_equal_extended_to_params(a: &Type<PortableForm>, b: &Type<PortableForm>
     };
 
     let type_params_a = collect_params(&a.type_params);
-    let type_params_b = collect_params(&a.type_params);
+    let type_params_b = collect_params(&b.type_params);
 
     if type_params_a.len() != type_params_b.len() {
         return false;
     }
-
     // returns true if the ids are the same OR if they point to the same generic parameter.
     let ids_equal = |a: u32, b: u32| -> bool {
         a == b

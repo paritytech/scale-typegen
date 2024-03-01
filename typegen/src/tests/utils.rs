@@ -6,6 +6,8 @@ use scale_info::{PortableRegistry, TypeInfo};
 use syn::parse_quote;
 
 use crate::typegen::ir::module_ir::ModuleIR;
+use crate::utils::ensure_unique_type_paths;
+use crate::TypegenError;
 use crate::{
     typegen::settings::substitutes::absolute_path, DerivesRegistry, TypeGenerator,
     TypeGeneratorSettings, TypeSubstitutes,
@@ -39,12 +41,25 @@ impl Testgen {
         module.to_token_stream()
     }
 
-    pub fn gen_tests_mod(self, settings: TypeGeneratorSettings) -> TokenStream {
-        let registry: PortableRegistry = self.registry.into();
+    pub fn try_gen_tests_mod(
+        self,
+        settings: TypeGeneratorSettings,
+        deduplicate: bool,
+    ) -> Result<TokenStream, TypegenError> {
+        let mut registry: PortableRegistry = self.registry.into();
+        if deduplicate {
+            ensure_unique_type_paths(&mut registry)
+        }
         let type_gen = TypeGenerator::new(&registry, &settings);
-        let module = type_gen.generate_types_mod().unwrap();
-        let module = get_mod(&module, TESTS_MOD_PATH).unwrap();
-        module.to_token_stream()
+        type_gen
+            .generate_types_mod()
+            .map(|module| get_mod(&module, TESTS_MOD_PATH).unwrap().to_token_stream())
+    }
+
+    pub fn gen_tests_mod(self, settings: TypeGeneratorSettings) -> TokenStream {
+        self.try_gen_tests_mod(settings, false)
+            .unwrap()
+            .to_token_stream()
     }
 }
 
@@ -158,7 +173,7 @@ pub(super) fn subxt_default_substitutes() -> TypeSubstitutes {
 
 const TESTS_MOD_PATH: &[&str] = &["scale_typegen", "tests"];
 
-fn get_mod<'a>(module: &'a ModuleIR, path_segs: &[&'static str]) -> Option<&'a ModuleIR> {
+fn get_mod<'a>(module: &'a ModuleIR, path_segs: &[&'static str]) -> Option<&'a ModuleIR<'a>> {
     let (mod_name, rest) = path_segs.split_first()?;
     let mod_ident: Ident = syn::parse_str(mod_name).unwrap();
     let module = module.children.get(&mod_ident)?;

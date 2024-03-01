@@ -15,7 +15,7 @@ use crate::{
         },
     },
     utils::ensure_unique_type_paths,
-    DerivesRegistry, TypeSubstitutes,
+    DerivesRegistry, TypeSubstitutes, TypegenError,
 };
 
 mod utils;
@@ -700,7 +700,7 @@ fn range_fields() {
 }
 
 #[test]
-fn generics() {
+fn generics_foo() {
     #[allow(unused)]
     #[derive(TypeInfo)]
     struct Foo<T> {
@@ -1431,4 +1431,63 @@ fn find_similar_type_paths() {
         parse_quote!(scale_typegen::tests::types::abc::S),
     ];
     assert_eq!(similar, expected);
+}
+
+#[test]
+fn assoc_types() {
+    pub trait Config {
+        type Inner: TypeInfo;
+    }
+
+    #[derive(TypeInfo)]
+    pub struct A;
+    #[derive(TypeInfo)]
+    pub struct B;
+
+    impl Config for A {
+        type Inner = ();
+    }
+
+    impl Config for B {
+        type Inner = u32;
+    }
+
+    #[derive(TypeInfo)]
+    // #[scale_info(skip_type_params(T))]
+    pub struct X<T: Config + TypeInfo> {
+        pub inner: T::Inner,
+    }
+
+    let res_no_dedup = Testgen::new()
+        .with::<X<A>>()
+        .with::<X<B>>()
+        .try_gen_tests_mod(subxt_settings(), false);
+    assert!(matches!(
+        res_no_dedup,
+        Err(TypegenError::DuplicateTypePath(_))
+    ));
+
+    let dedup_code = Testgen::new()
+        .with::<X<A>>()
+        .with::<X<B>>()
+        .try_gen_tests_mod(Default::default(), true)
+        .unwrap();
+
+    let expected_code = quote! {
+        pub mod tests {
+            use super::types;
+            pub struct A;
+            pub struct B;
+            pub struct X1<_0> {
+                pub inner: (),
+                pub __ignore: ::core::marker::PhantomData<_0>
+            }
+            pub struct X2<_0> {
+                pub inner: ::core::primitive::u32,
+                pub __ignore: ::core::marker::PhantomData<_0>
+            }
+        }
+    };
+
+    assert_eq!(dedup_code.to_string(), expected_code.to_string());
 }
