@@ -1,6 +1,5 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::{quote, ToTokens};
-use scale_info::{form::PortableForm, Type};
 
 use crate::typegen::{
     settings::derives::Derives, type_params::TypeParameters, type_path::TypePath,

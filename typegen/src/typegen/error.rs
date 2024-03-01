@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use proc_macro2::Span;
 use quote::ToTokens;
-use scale_info::form::PortableForm;
 
 /// Error for when something went wrong during type generation.
 #[derive(Debug, thiserror::Error)]
