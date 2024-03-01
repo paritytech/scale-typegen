@@ -1434,14 +1434,12 @@ fn find_similar_type_paths() {
 }
 
 #[test]
-fn assoc_types() {
+fn assoc_types_skip_params() {
     pub trait Config {
         type Inner: TypeInfo;
     }
 
-    #[derive(TypeInfo)]
     pub struct A;
-    #[derive(TypeInfo)]
     pub struct B;
 
     impl Config for A {
@@ -1453,8 +1451,8 @@ fn assoc_types() {
     }
 
     #[derive(TypeInfo)]
-    // #[scale_info(skip_type_params(T))]
-    pub struct X<T: Config + TypeInfo> {
+    #[scale_info(skip_type_params(T))]
+    pub struct X<T: Config> {
         pub inner: T::Inner,
     }
 
@@ -1473,6 +1471,61 @@ fn assoc_types() {
         .try_gen_tests_mod(Default::default(), true)
         .unwrap();
 
+    let expected_code = quote! {
+        pub mod tests {
+            use super::types;
+            pub struct X1 {
+                pub inner: (),
+            }
+            pub struct X2 {
+                pub inner: ::core::primitive::u32,
+            }
+        }
+    };
+
+    assert_eq!(dedup_code.to_string(), expected_code.to_string());
+}
+
+#[test]
+fn assoc_types_no_skip_params() {
+    pub trait Config {
+        type Inner: TypeInfo;
+    }
+
+    #[derive(TypeInfo)]
+    pub struct A;
+
+    #[derive(TypeInfo)]
+    pub struct B;
+
+    impl Config for A {
+        type Inner = ();
+    }
+    impl Config for B {
+        type Inner = u32;
+    }
+
+    #[derive(TypeInfo)]
+    pub struct X<T: Config> {
+        pub inner: T::Inner,
+    }
+
+    let res_no_dedup = Testgen::new()
+        .with::<X<A>>()
+        .with::<X<B>>()
+        .try_gen_tests_mod(subxt_settings(), false);
+    assert!(matches!(
+        res_no_dedup,
+        Err(TypegenError::DuplicateTypePath(_))
+    ));
+
+    let dedup_code = Testgen::new()
+        .with::<X<A>>()
+        .with::<X<B>>()
+        .try_gen_tests_mod(Default::default(), true)
+        .unwrap();
+
+    // Unfortunately the structs A and B are still part of the type registry and X1 and X2 have generic parameters, linking to them.
     let expected_code = quote! {
         pub mod tests {
             use super::types;
