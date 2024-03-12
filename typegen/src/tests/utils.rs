@@ -6,6 +6,7 @@ use scale_info::{PortableRegistry, TypeInfo};
 use syn::parse_quote;
 
 use crate::typegen::ir::module_ir::ModuleIR;
+use crate::utils::ensure_unique_type_paths;
 use crate::{
     typegen::settings::substitutes::absolute_path, DerivesRegistry, TypeGenerator,
     TypeGeneratorSettings, TypeSubstitutes,
@@ -33,7 +34,8 @@ impl Testgen {
     }
 
     pub fn gen(self, settings: TypeGeneratorSettings) -> TokenStream {
-        let registry: PortableRegistry = self.registry.into();
+        let mut registry: PortableRegistry = self.registry.into();
+        ensure_unique_type_paths(&mut registry);
         let type_gen = TypeGenerator::new(&registry, &settings);
         let module = type_gen.generate_types_mod().unwrap();
         module.to_token_stream()

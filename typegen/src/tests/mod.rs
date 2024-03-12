@@ -21,6 +21,158 @@ use crate::{
 mod utils;
 
 #[test]
+fn more_than_1_generic_parameters() {
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct Foo<T, U, V, W> {
+        a: T,
+        b: U,
+        c: V,
+        d: W,
+    }
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    struct Bar {
+        p: Foo<u32, u32, u64, u128>,
+        q: Foo<u8, u8, u8, u8>,
+    }
+
+    let generated = Testgen::new()
+        .with::<Bar>()
+        .gen_tests_mod(Default::default());
+
+    #[rustfmt::skip]
+    let expected = quote!(
+        pub mod tests {
+            use super::types;
+            pub struct Bar {
+                pub p: types::scale_typegen::tests::Foo<
+                    ::core::primitive::u32,
+                    ::core::primitive::u32,
+                    ::core::primitive::u64,
+                    ::core::primitive::u128
+                >,
+                pub q: types::scale_typegen::tests::Foo<
+                    ::core::primitive::u8,
+                    ::core::primitive::u8,
+                    ::core::primitive::u8,
+                    ::core::primitive::u8
+                >,
+            }
+            pub struct Foo<_0, _1, _2, _3> {
+                pub a: _0,
+                pub b: _1,
+                pub c: _2,
+                pub d: _3,
+            }
+        }
+    );
+
+    assert_eq!(generated.to_string(), expected.to_string());
+}
+
+#[test]
+fn dupe_types_do_not_overwrite_each_other() {
+    enum Foo {}
+    impl TypeInfo for Foo {
+        type Identity = Self;
+        fn type_info() -> scale_info::Type {
+            scale_info::Type::builder()
+                .path(scale_info::Path::new("DuplicateType", "dupe_mod"))
+                .variant(
+                    scale_info::build::Variants::new()
+                        .variant("FirstDupeTypeVariant", |builder| builder.index(0)),
+                )
+        }
+    }
+    enum Bar {}
+    impl TypeInfo for Bar {
+        type Identity = Self;
+        fn type_info() -> scale_info::Type {
+            scale_info::Type::builder()
+                .path(scale_info::Path::new("DuplicateType", "dupe_mod"))
+                .variant(
+                    scale_info::build::Variants::new()
+                        .variant("SecondDupeTypeVariant", |builder| builder.index(0)),
+                )
+        }
+    }
+
+    let generated = Testgen::new()
+        .with::<Foo>()
+        .with::<Bar>()
+        .gen(Default::default())
+        .to_string();
+
+    let expected = quote!(
+        pub mod types {
+            use super::types;
+            pub mod dupe_mod {
+                use super::types;
+                pub enum DuplicateType1 {
+                    FirstDupeTypeVariant,
+                }
+                pub enum DuplicateType2 {
+                    SecondDupeTypeVariant,
+                }
+            }
+        }
+    );
+
+    assert_eq!(generated.to_string(), expected.to_string());
+}
+
+#[test]
+fn generic_types_overwrite_each_other() {
+    use scale_info::meta_type;
+
+    // If we have two types mentioned in the registry that have generic params,
+    // only one type will be output (the codegen assumes that the generic param will disambiguate)
+    enum Foo {}
+    impl TypeInfo for Foo {
+        type Identity = Self;
+        fn type_info() -> scale_info::Type {
+            scale_info::Type::builder()
+                .path(scale_info::Path::new("DuplicateType", "dupe_mod"))
+                .type_params([scale_info::TypeParameter::new("T", Some(meta_type::<u8>()))])
+                .variant(scale_info::build::Variants::new())
+        }
+    }
+    enum Bar {}
+    impl TypeInfo for Bar {
+        type Identity = Self;
+        fn type_info() -> scale_info::Type {
+            scale_info::Type::builder()
+                .path(scale_info::Path::new("DuplicateType", "dupe_mod"))
+                .type_params([scale_info::TypeParameter::new("T", Some(meta_type::<u8>()))])
+                .variant(scale_info::build::Variants::new())
+        }
+    }
+
+    let generated = Testgen::new()
+        .with::<Foo>()
+        .with::<Bar>()
+        .gen(Default::default())
+        .to_string();
+
+    // Since a generic is present on the type, we do _not_ expect two types to be generated:
+    let expected = quote!(
+        pub mod types {
+            use super::types;
+            pub mod dupe_mod {
+                use super::types;
+                pub enum DuplicateType<_0> {
+                    __Ignore(::core::marker::PhantomData<_0>),
+                }
+            }
+        }
+    );
+
+    assert_eq!(generated.to_string(), expected.to_string());
+}
+
+#[test]
 fn substitutes_with_generics() {
     #[allow(unused)]
     #[derive(TypeInfo)]
