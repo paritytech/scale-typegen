@@ -1,5 +1,6 @@
 use scale_info::{form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeParameter};
-use std::collections::HashMap;
+use smallvec::{smallvec, SmallVec};
+use std::collections::{hash_map::Entry, HashMap};
 
 use crate::TypegenError;
 
@@ -85,23 +86,46 @@ pub(crate) fn types_equal_extended_to_params(
     a: &Type<PortableForm>,
     b: &Type<PortableForm>,
 ) -> bool {
-    let collect_params = |type_params: &[TypeParameter<PortableForm>]| {
-        type_params
-            .iter()
-            .filter_map(|p| p.ty.map(|ty| (ty.id, p.name.clone())))
-            .collect::<HashMap<u32, String>>()
-    };
+    // We map each type ID to all type params if could refer to. Type IDs can refer to multiple parameters:
+    // E.g. Foo<A,B> can be parameterized as Foo<u8,u8>, so if 42 is the type id of u8, a filed with id=42 could refer to eiher A or B.
+    fn collect_params(
+        type_params: &[TypeParameter<PortableForm>],
+    ) -> HashMap<u32, SmallVec<[&str; 2]>> {
+        let mut hm: HashMap<u32, SmallVec<[&str; 2]>> = HashMap::new();
+        for p in type_params {
+            if let Some(ty) = &p.ty {
+                match hm.entry(ty.id) {
+                    Entry::Occupied(mut e) => {
+                        e.get_mut().push(p.name.as_str());
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(smallvec![p.name.as_str()]);
+                    }
+                }
+            }
+        }
+        hm
+    }
 
     let type_params_a = collect_params(&a.type_params);
     let type_params_b = collect_params(&b.type_params);
 
-    if type_params_a.len() != type_params_b.len() {
+    if a.type_params.len() != b.type_params.len() {
         return false;
     }
-    // returns true if the ids are the same OR if they point to the same generic parameter.
+    // Returns true if the ids are the same OR if they point to the same generic parameter.
     let ids_equal = |a: u32, b: u32| -> bool {
-        a == b
-            || matches!((type_params_a.get(&a), type_params_b.get(&b)), (Some(a_name), Some(b_name)) if a_name == b_name)
+        if a == b {
+            return true;
+        }
+        let Some(a_param_names) = type_params_a.get(&a) else {
+            return false;
+        };
+        let Some(b_param_names) = type_params_b.get(&b) else {
+            return false;
+        };
+        // Check if there is any intersection, meaning that both IDs map to the same generic type param:
+        a_param_names.iter().any(|a_p| b_param_names.contains(a_p))
     };
 
     let fields_equal = |a: &[Field<PortableForm>], b: &[Field<PortableForm>]| -> bool {
