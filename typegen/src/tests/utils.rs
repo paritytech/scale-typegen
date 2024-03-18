@@ -35,7 +35,8 @@ impl Testgen {
     }
 
     pub fn gen(self, settings: TypeGeneratorSettings) -> TokenStream {
-        let registry: PortableRegistry = self.registry.into();
+        let mut registry: PortableRegistry = self.registry.into();
+        ensure_unique_type_paths(&mut registry);
         let type_gen = TypeGenerator::new(&registry, &settings);
         let module = type_gen.generate_types_mod().unwrap();
         module.to_token_stream()
