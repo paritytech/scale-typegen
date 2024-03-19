@@ -87,7 +87,7 @@ pub(crate) fn types_equal_extended_to_params(
     b: &Type<PortableForm>,
 ) -> bool {
     // We map each type ID to all type params if could refer to. Type IDs can refer to multiple parameters:
-    // E.g. Foo<A,B> can be parameterized as Foo<u8,u8>, so if 42 is the type id of u8, a filed with id=42 could refer to eiher A or B.
+    // E.g. Foo<A,B> can be parameterized as Foo<u8,u8>, so if 42 is the type id of u8, a field with id=42 could refer to either A or B.
     fn collect_params(
         type_params: &[TypeParameter<PortableForm>],
     ) -> HashMap<u32, SmallVec<[&str; 2]>> {
