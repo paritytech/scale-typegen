@@ -1,4 +1,6 @@
-use crate::TypegenError;
+use std::collections::btree_map::Entry;
+
+use crate::{utils::types_equal_extended_to_params, TypegenError};
 
 use self::{
     ir::module_ir::ModuleIR,
@@ -89,10 +91,24 @@ impl<'a> TypeGenerator<'a> {
             }
 
             // if the type is not a builtin type, insert it into the respective module
-            if let Some(type_ir) = self.create_type_ir(&ty.ty, &flat_derives_registry)? {
+            let ty = &ty.ty;
+            if let Some(type_ir) = self.create_type_ir(ty, &flat_derives_registry)? {
                 // Create the module this type should go into
                 let innermost_module = root_mod.get_or_insert_submodule(namespace);
-                innermost_module.types.insert(path.clone(), type_ir);
+                match innermost_module.types.entry(path.clone()) {
+                    Entry::Vacant(e) => {
+                        e.insert((ty, type_ir));
+                    }
+                    Entry::Occupied(e) => {
+                        // There is already a type with the same type path present.
+                        // We do not just want to override it, so we check if the two types are semantically similar (structure + generics).
+                        // If not, return an error, if yes, just keep the first one.
+                        let other_ty = &e.get().0;
+                        if !types_equal_extended_to_params(ty, other_ty) {
+                            return Err(TypegenError::DuplicateTypePath(ty.path.to_string()));
+                        }
+                    }
+                };
             }
         }
 

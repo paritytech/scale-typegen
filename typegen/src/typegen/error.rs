@@ -31,6 +31,10 @@ pub enum TypegenError {
     /// The settings do not fit the given type registry.
     #[error("Settings do not fit the given type registry: {0}")]
     SettingsValidation(SettingsValidationError),
+    /// There are two types with the the same type path but a different structure.
+    /// Use [`crate::utils::ensure_unique_type_paths`] on your [`scale_info::PortableRegistry`] to deduplicate type paths.
+    #[error("There are two types with the the same type path {0} but different structure. Use `scale_typegen::utils::ensure_unique_type_paths` on your `PortableRegistry` before, to avoid this error.")]
+    DuplicateTypePath(String),
 }
 
 /// Error attempting to do type substitution.
