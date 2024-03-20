@@ -1,3 +1,10 @@
+# [0.3.0] - 2024-03-19
+
+- When generating rust code with `TypeGenerator::gerate_types_mod` we now validate that no type 
+is overwritten by another type that has an identical type path but a different structure. In case this happens, 
+we return an error and encourage users to use `scale_typegen::utils::ensure_unique_type_paths` on
+the type registry before. Doing so, should let the type generation succeed.
+
 # [0.2.0] - 2024-03-01
 
 - bumped dependencies of `scale-*` crates.

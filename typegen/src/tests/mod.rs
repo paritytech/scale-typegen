@@ -288,6 +288,7 @@ fn can_omit_compact_encoding() {
     }
 
     #[derive(TypeInfo)]
+    #[allow(unused)]
     pub struct Centimeter(Compact<u16>);
 
     #[allow(unused)]
