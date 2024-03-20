@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 
+use crate::TypeGeneratorSettings;
+
 use super::type_ir::TypeIR;
+use super::{ToTokensWithSettings, ToTokensWithSettingsT};
 use proc_macro2::Span;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use quote::ToTokens;
 use scale_info::form::PortableForm;
 
 /// Represents a Rust `mod`, containing generated types and child `mod`s.
@@ -21,12 +23,19 @@ pub struct ModuleIR<'a> {
         BTreeMap<scale_info::Path<PortableForm>, (&'a scale_info::Type<PortableForm>, TypeIR)>,
 }
 
-impl<'a> ToTokens for ModuleIR<'a> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
+impl<'a> ToTokensWithSettingsT for ModuleIR<'a> {
+    fn to_tokens(&self, tokens: &mut TokenStream, settings: &TypeGeneratorSettings) {
         let name = &self.name;
         let root_mod = &self.root_mod;
-        let modules = self.children.values();
-        let types = self.types.values().map(|e| &e.1).clone();
+        let modules = self
+            .children
+            .values()
+            .map(|v| ToTokensWithSettings::new(v, settings));
+        let types = self
+            .types
+            .values()
+            .map(|e| ToTokensWithSettings::new(&e.1, settings))
+            .clone();
 
         tokens.extend(quote! {
             pub mod #name {

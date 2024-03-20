@@ -2,9 +2,8 @@ use std::marker::PhantomData;
 
 use parity_scale_codec::Decode;
 use proc_macro2::TokenStream;
-use quote::ToTokens;
 use scale_info::PortableRegistry;
-use scale_typegen::{TypeGenerator, TypeGeneratorSettings};
+use scale_typegen::{typegen::ir::ToTokensWithSettingsT, TypeGenerator, TypeGeneratorSettings};
 use syn::parse_quote;
 
 #[allow(unused)]
@@ -27,7 +26,7 @@ pub fn main() {
     let code = type_generator
         .generate_types_mod()
         .unwrap()
-        .to_token_stream();
+        .to_token_stream(&settings);
 
     write_pretty_tokens(code, "./artifacts/generated_polkadot.rs");
 }
