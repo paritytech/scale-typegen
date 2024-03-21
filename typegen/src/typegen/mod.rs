@@ -105,6 +105,7 @@ impl<'a> TypeGenerator<'a> {
                         // If not, return an error, if yes, just keep the first one.
                         let other_ty = &e.get().0;
                         if !types_equal_extended_to_params(ty, other_ty) {
+                            println!("These types are not equal, but should have gotten unique type paths:\n\nType A: {ty:#?}\n\nType B: {other_ty:#?}");
                             return Err(TypegenError::DuplicateTypePath(ty.path.to_string()));
                         }
                     }

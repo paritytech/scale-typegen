@@ -54,14 +54,20 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
 
     for groups_with_same_path in groups_that_need_renaming {
         let mut n = 1;
+        println!("--------------------------");
+        println!("groups_with_same_path: {groups_with_same_path:?}");
         for group_with_same_shape in groups_with_same_path {
+            println!("    group_with_same_shape: {group_with_same_shape:?}");
             for ty_id in group_with_same_shape {
                 let ty = types
                     .types
                     .get_mut(ty_id as usize)
                     .expect("type is present; qed;");
+                // println!("        {ty:?}");
                 let name = ty.ty.path.segments.last_mut().expect("This is only empty for builtin types, that are filtered out with namespace().is_empty() above; qed;");
-                *name = format!("{name}{n}"); // e.g. Header1, Header2, Header3, ...
+                let new_name = format!("{name}{n}"); // e.g. Header1, Header2, Header3, ...
+                println!("        Rename type with id={ty_id}:  {name} --> {new_name}");
+                *name = new_name
             }
             n += 1;
         }
