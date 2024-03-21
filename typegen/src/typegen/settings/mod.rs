@@ -34,14 +34,12 @@ pub struct TypeGeneratorSettings {
     /// TypePath to the Compact<T> struct.
     /// E.g. `subxt::ext::codec::Compact`
     pub compact_type_path: Option<syn::Path>,
-
     /// If false, no codec attributes like `codec(index=0)` and `codec(compact)` are inserted.
     /// This is a useful option if we do not want to derive Decode and Encode on our types.
     pub insert_codec_attributes: bool,
-
-    /// If None, use types from the `std` library like `String`, `Box`, `Vec` directly from the rust prelude.
-    /// If set to some path, e.g. just "alloc", if `extern crate alloc;` is used, we use `alloc::string::String`,
-    /// `alloc::vec::Vec` and `alloc::boxed::Box` instead.
+    /// Configure a custom type path for the `alloc` crate, which is the base for generating type paths like
+    /// `alloc::string::String`, `alloc::vec::Vec` and `alloc::boxed::Box`. The default is `AllocCratePath::Std` which
+    /// uses the types from the `std` library instead.
     pub alloc_crate_path: AllocCratePath,
 }
 
