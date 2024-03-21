@@ -34,7 +34,7 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
             let ty_id_b = group[0]; // all types in group are same shape; just check any one of them.
             let ty_b = types.resolve(ty_id_b).expect("ty exists");
             if types_equal_extended_to_params(&ty.ty, ty_b) {
-                group.push(ty_id_b);
+                group.push(ty.id);
                 added_to_existing_group = true;
                 break;
             }
@@ -164,5 +164,70 @@ pub(crate) fn types_equal_extended_to_params(
                 && ids_equal(a.bit_store_type.id, b.bit_store_type.id)
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use scale_info::{meta_type, Path, PortableRegistry};
+
+    use crate::utils::ensure_unique_type_paths;
+
+    #[test]
+    fn ensure_unique_type_paths_test() {
+        macro_rules! foo {
+            ($ty:ident, $prim:ident ) => {
+                struct $ty;
+                impl scale_info::TypeInfo for $ty {
+                    type Identity = Self;
+                    fn type_info() -> scale_info::Type {
+                        scale_info::Type {
+                            path: Path::new("Foo", "my::module"),
+                            type_params: vec![],
+                            type_def: scale_info::TypeDef::Primitive(
+                                scale_info::TypeDefPrimitive::$prim,
+                            ),
+                            docs: vec![],
+                        }
+                    }
+                }
+            };
+        }
+
+        foo!(Foo1, Bool);
+        foo!(Foo2, Bool);
+        foo!(Foo3, U32);
+        foo!(Foo4, U128);
+        foo!(Foo5, U128);
+        foo!(Foo6, U128);
+
+        let mut registry = scale_info::Registry::new();
+        let id_1 = registry.register_type(&meta_type::<Foo1>()).id;
+        let id_2 = registry.register_type(&meta_type::<Foo2>()).id;
+        let id_3 = registry.register_type(&meta_type::<Foo3>()).id;
+        let id_4 = registry.register_type(&meta_type::<Foo4>()).id;
+        let id_5 = registry.register_type(&meta_type::<Foo5>()).id;
+        let id_6 = registry.register_type(&meta_type::<Foo6>()).id;
+        let mut registry = PortableRegistry::from(registry);
+
+        // before:
+        let ident = |id: u32| registry.resolve(id).unwrap().path.ident().unwrap();
+        assert_eq!(ident(id_1), "Foo");
+        assert_eq!(ident(id_2), "Foo");
+        assert_eq!(ident(id_3), "Foo");
+        assert_eq!(ident(id_4), "Foo");
+        assert_eq!(ident(id_5), "Foo");
+        assert_eq!(ident(id_6), "Foo");
+
+        // after:
+        ensure_unique_type_paths(&mut registry);
+
+        let ident = |id: u32| registry.resolve(id).unwrap().path.ident().unwrap();
+        assert_eq!(ident(id_1), "Foo1");
+        assert_eq!(ident(id_2), "Foo1");
+        assert_eq!(ident(id_3), "Foo2");
+        assert_eq!(ident(id_4), "Foo3");
+        assert_eq!(ident(id_5), "Foo3");
+        assert_eq!(ident(id_6), "Foo3");
     }
 }
