@@ -1,6 +1,8 @@
-# [0.3.1] - 2024-03-21
+# [0.4.0] - 2024-03-21
 
 - Fix logic bug in `scale_typegen::utils::ensure_unique_type_paths`.
+
+- You can now specify a custom path to the `alloc` crate in the settings. It is used for type paths that are typically in the rust prelude or in the `std` library, like `Vec`, `Box` and `String`. This gives you the option to use the generated code in a `no_std` environment.
 
 # [0.3.0] - 2024-03-19
 

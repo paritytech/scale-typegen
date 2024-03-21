@@ -421,7 +421,7 @@ dependencies = [
 
 [[package]]
 name = "scale-typegen"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "bitvec",
  "frame-metadata 16.0.0",
@@ -439,7 +439,7 @@ dependencies = [
 
 [[package]]
 name = "scale-typegen-description"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "indoc",
