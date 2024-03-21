@@ -3,9 +3,12 @@ use scale_info::form::PortableForm;
 use std::{borrow::Borrow, collections::HashMap};
 use syn::{parse_quote, spanned::Spanned as _, PathSegment};
 
-use crate::typegen::{
-    error::{TypeSubstitutionError, TypeSubstitutionErrorKind},
-    type_path::{TypePath, TypePathType},
+use crate::{
+    typegen::{
+        error::{TypeSubstitutionError, TypeSubstitutionErrorKind},
+        type_path::{TypePath, TypePathType},
+    },
+    TypeGeneratorSettings,
 };
 
 use TypeSubstitutionErrorKind::*;
@@ -209,6 +212,7 @@ impl TypeSubstitutes {
         &self,
         path: &PathSegments,
         params: &[TypePath],
+        settings: &TypeGeneratorSettings,
     ) -> Option<TypePathType> {
         // If we find a substitute type, we'll take the substitute path, and
         // swap any idents with their new concrete types.
@@ -216,6 +220,7 @@ impl TypeSubstitutes {
             mut substitute_path: syn::Path,
             params: &[TypePath],
             mapping: &TypeParamMapping,
+            settings: &TypeGeneratorSettings,
         ) -> TypePathType {
             match mapping {
                 // We need to map the input params to the output params somehow:
@@ -229,7 +234,11 @@ impl TypeSubstitutes {
                     // Replace params in our substitute path with the incoming ones as needed.
                     // No need if no replacements given.
                     if !replacement_map.is_empty() {
-                        replace_path_params_recursively(&mut substitute_path, &replacement_map);
+                        replace_path_params_recursively(
+                            &mut substitute_path,
+                            &replacement_map,
+                            settings,
+                        );
                     }
 
                     TypePathType::Path {
@@ -247,7 +256,7 @@ impl TypeSubstitutes {
 
         self.substitutes
             .get(path)
-            .map(|sub| replace_params(sub.path.clone(), params, &sub.param_mapping))
+            .map(|sub| replace_params(sub.path.clone(), params, &sub.param_mapping, settings))
     }
 
     /// Returns an iterator over all substitutes.
@@ -271,6 +280,7 @@ impl TypeSubstitutes {
 fn replace_path_params_recursively<I: Borrow<syn::Ident>, P: Borrow<TypePath>>(
     path: &mut syn::Path,
     params: &Vec<(I, P)>,
+    settings: &TypeGeneratorSettings,
 ) {
     for segment in &mut path.segments {
         let syn::PathArguments::AngleBracketed(args) = &mut segment.arguments else {
@@ -285,11 +295,11 @@ fn replace_path_params_recursively<I: Borrow<syn::Ident>, P: Borrow<TypePath>>(
             };
             if let Some(ident) = get_ident_from_type_path(path) {
                 if let Some((_, replacement)) = params.iter().find(|(i, _)| ident == i.borrow()) {
-                    *ty = replacement.borrow().to_syn_type();
+                    *ty = replacement.borrow().to_syn_type(&settings.alloc_crate_path);
                     continue;
                 }
             }
-            replace_path_params_recursively(&mut path.path, params);
+            replace_path_params_recursively(&mut path.path, params, settings);
         }
     }
 }
@@ -466,8 +476,9 @@ mod test {
             ),
         ];
 
+        let settings = TypeGeneratorSettings::new();
         for (mut path, replacements, expected) in paths {
-            replace_path_params_recursively(&mut path, &replacements);
+            replace_path_params_recursively(&mut path, &replacements, &settings);
             assert_eq!(path, expected);
         }
     }

@@ -1,10 +1,10 @@
 use crate::transformer::Transformer;
 use anyhow::anyhow;
 use proc_macro2::{TokenStream, TokenTree};
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote};
 use rand::{seq::SliceRandom, SeedableRng};
 use scale_info::{form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeDefPrimitive};
-use scale_typegen::{TypeGenerator, TypeGeneratorSettings};
+use scale_typegen::{typegen::ir::ToTokensWithSettings, TypeGenerator, TypeGeneratorSettings};
 use std::cell::RefCell;
 
 /// A transformer capable of converting a [`scale_info::Type`] from a type registry into
@@ -34,12 +34,11 @@ impl<'a> CodeTransformer<'a> {
     /// resolves a type path, removes the generic bits, e.g. `Foo<T, R>` becomes `Foo`,
     /// and, if the correct ty_path_middleware is set, prunes the resulting type path.
     fn resolve_type_path_omit_generics(&self, type_id: u32) -> anyhow::Result<TokenStream> {
-        let mut type_path = self
-            .state()
-            .type_generator
+        let gen = self.state().type_generator;
+        let mut type_path = gen
             .resolve_type_path(type_id)
             .map_err(|e| anyhow!("{e}"))?
-            .to_token_stream();
+            .to_token_stream(gen.settings());
 
         // apply ty path middleware pruning/replacing paths:
         if let Some(ty_path_middleware) = &self.state().ty_path_middleware {

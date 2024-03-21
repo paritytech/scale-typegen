@@ -6,6 +6,7 @@ use scale_info::{PortableRegistry, TypeInfo};
 use syn::parse_quote;
 
 use crate::typegen::ir::module_ir::ModuleIR;
+use crate::typegen::ir::ToTokensWithSettings;
 use crate::utils::ensure_unique_type_paths;
 use crate::TypegenError;
 use crate::{
@@ -39,7 +40,7 @@ impl Testgen {
         ensure_unique_type_paths(&mut registry);
         let type_gen = TypeGenerator::new(&registry, &settings);
         let module = type_gen.generate_types_mod().unwrap();
-        module.to_token_stream()
+        module.to_token_stream(&settings)
     }
 
     pub fn try_gen_tests_mod(
@@ -52,9 +53,11 @@ impl Testgen {
             ensure_unique_type_paths(&mut registry)
         }
         let type_gen = TypeGenerator::new(&registry, &settings);
-        type_gen
-            .generate_types_mod()
-            .map(|module| get_mod(&module, TESTS_MOD_PATH).unwrap().to_token_stream())
+        type_gen.generate_types_mod().map(|module| {
+            get_mod(&module, TESTS_MOD_PATH)
+                .unwrap()
+                .to_token_stream(&settings)
+        })
     }
 
     pub fn gen_tests_mod(self, settings: TypeGeneratorSettings) -> TokenStream {
@@ -74,6 +77,7 @@ pub(super) fn subxt_settings() -> TypeGeneratorSettings {
         insert_codec_attributes: true,
         compact_as_type_path: Some(parse_quote!(::subxt_path::ext::codec::CompactAs)),
         compact_type_path: Some(parse_quote!(::subxt_path::ext::codec::Compact)),
+        alloc_crate_path: Default::default(),
     }
 }
 /// Derives mirroring the subxt default derives
