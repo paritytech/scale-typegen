@@ -9,7 +9,7 @@ use crate::{
     tests::utils::{subxt_settings, Testgen},
     typegen::{
         error::SettingsValidationError,
-        settings::TypeGeneratorSettings,
+        settings::{AllocCratePath, TypeGeneratorSettings},
         validation::{
             similar_type_paths_in_registry, validate_substitutes_and_derives_against_registry,
         },
@@ -1696,4 +1696,68 @@ fn assoc_types_no_skip_params() {
     };
 
     assert_eq!(dedup_code.to_string(), expected_code.to_string());
+}
+
+#[test]
+fn alloc_crate_path_replacement() {
+    use std::collections::BTreeMap;
+
+    #[derive(TypeInfo)]
+    #[allow(unused)]
+    pub struct Foo {
+        a: Vec<Foo>,
+        b: Box<u8>,
+        c: String,
+        e: BTreeMap<String, Box<u8>>,
+    }
+
+    let std_code = Testgen::new()
+        .with::<Foo>()
+        .try_gen_tests_mod(Default::default(), false)
+        .unwrap();
+
+    let no_std_code = Testgen::new()
+        .with::<Foo>()
+        .try_gen_tests_mod(
+            TypeGeneratorSettings {
+                alloc_crate_path: AllocCratePath::Custom(parse_quote!(::subxt_core::alloc)),
+                ..Default::default()
+            },
+            false,
+        )
+        .unwrap();
+
+    let expected_std_code = quote! {
+        pub mod tests {
+            use super::types;
+            pub struct Foo {
+                pub a: ::std::vec::Vec<types::scale_typegen::tests::Foo>,
+                pub b: ::std::boxed::Box<::core::primitive::u8>,
+                pub c: ::std::string::String,
+                pub e: ::std::boxed::Box<
+                    ::std::collections::BTreeMap<::std::string::String, ::core::primitive::u8>
+                >,
+            }
+        }
+    };
+
+    let expected_no_std_code = quote! {
+        pub mod tests {
+            use super::types;
+            pub struct Foo {
+                pub a: ::subxt_core::alloc::vec::Vec<types::scale_typegen::tests::Foo>,
+                pub b: ::subxt_core::alloc::boxed::Box<::core::primitive::u8>,
+                pub c: ::subxt_core::alloc::string::String,
+                pub e: ::subxt_core::alloc::boxed::Box<
+                    ::subxt_core::alloc::collections::BTreeMap<
+                        ::subxt_core::alloc::string::String,
+                        ::core::primitive::u8
+                    >
+                >,
+            }
+        }
+    };
+
+    assert_eq!(std_code.to_string(), expected_std_code.to_string());
+    assert_eq!(no_std_code.to_string(), expected_no_std_code.to_string());
 }

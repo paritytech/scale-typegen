@@ -1,5 +1,6 @@
 use derives::DerivesRegistry;
 use proc_macro2::Ident;
+use quote::{quote, ToTokens};
 use substitutes::TypeSubstitutes;
 use syn::parse_quote;
 
@@ -33,10 +34,36 @@ pub struct TypeGeneratorSettings {
     /// TypePath to the Compact<T> struct.
     /// E.g. `subxt::ext::codec::Compact`
     pub compact_type_path: Option<syn::Path>,
-
     /// If false, no codec attributes like `codec(index=0)` and `codec(compact)` are inserted.
     /// This is a useful option if we do not want to derive Decode and Encode on our types.
     pub insert_codec_attributes: bool,
+    /// Configure a custom type path for the `alloc` crate, which is the base for generating type paths like
+    /// `alloc::string::String`, `alloc::vec::Vec` and `alloc::boxed::Box`. The default is `AllocCratePath::Std` which
+    /// uses the types from the `std` library instead.
+    pub alloc_crate_path: AllocCratePath,
+}
+
+/// Information about how to construct the type paths for types that need allocation, e.g.
+#[derive(Debug, Clone, Default)]
+pub enum AllocCratePath {
+    /// Equivalent to `AllocCratePath::Custom(quote!(::std))`. This is the default.
+    #[default]
+    Std,
+    /// Custom path to the alloc crate, e.g. `::alloc` if `extern crate alloc;` is used
+    /// or e.g. `::subxt_core::alloc` if the alloc crate is exported from another crate.
+    ///
+    /// We'd expect the Custom path to export `vec::Vec`, `string::String`, `boxed::Box`
+    /// and `collections::BTreeMap`.
+    Custom(syn::Path),
+}
+
+impl ToTokens for AllocCratePath {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        match self {
+            AllocCratePath::Std => quote!(::std).to_tokens(tokens),
+            AllocCratePath::Custom(alloc_path) => alloc_path.to_tokens(tokens),
+        }
+    }
 }
 
 impl Default for TypeGeneratorSettings {
@@ -50,6 +77,7 @@ impl Default for TypeGeneratorSettings {
             compact_as_type_path: None,
             compact_type_path: None,
             insert_codec_attributes: false,
+            alloc_crate_path: Default::default(),
         }
     }
 }
