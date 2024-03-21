@@ -285,7 +285,7 @@ fn replace_path_params_recursively<I: Borrow<syn::Ident>, P: Borrow<TypePath>>(
             };
             if let Some(ident) = get_ident_from_type_path(path) {
                 if let Some((_, replacement)) = params.iter().find(|(i, _)| ident == i.borrow()) {
-                    *ty = replacement.borrow().to_syn_type();
+                    *ty = replacement.borrow().to_syn_type(&Default::default());
                     continue;
                 }
             }

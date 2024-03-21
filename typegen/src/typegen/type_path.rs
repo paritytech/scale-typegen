@@ -3,10 +3,15 @@
 // see LICENSE for license details.
 
 use proc_macro2::{Ident, TokenStream};
-use quote::format_ident;
+use quote::{format_ident, ToTokens};
 use scale_info::{form::PortableForm, Path, TypeDefPrimitive};
 use std::collections::BTreeSet;
 use syn::parse_quote;
+
+use crate::TypeGeneratorSettings;
+
+use super::ir::ToTokensWithSettingsT;
+use super::settings::AllocCratePath;
 
 /// An opaque struct representing a type path. The main usage of this is
 /// to spit out as tokens in some `quote!{ ... }` macro; the inner structure
@@ -23,9 +28,9 @@ pub enum TypePathInner {
     Type(TypePathType),
 }
 
-impl quote::ToTokens for TypePath {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let syn_type = self.to_syn_type();
+impl ToTokensWithSettingsT for TypePath {
+    fn to_tokens(&self, tokens: &mut TokenStream, settings: &TypeGeneratorSettings) {
+        let syn_type = self.to_syn_type(&settings.alloc_crate_path);
         syn_type.to_tokens(tokens)
     }
 }
@@ -51,10 +56,10 @@ impl TypePath {
         }))
     }
 
-    pub(crate) fn to_syn_type(&self) -> syn::Type {
+    pub(crate) fn to_syn_type(&self, alloc_crate_path: &AllocCratePath) -> syn::Type {
         match &self.0 {
             TypePathInner::Parameter(ty_param) => syn::Type::Path(parse_quote! { #ty_param }),
-            TypePathInner::Type(ty) => ty.to_syn_type(),
+            TypePathInner::Type(ty) => ty.to_syn_type(alloc_crate_path),
         }
     }
 
@@ -180,6 +185,7 @@ impl TypePathType {
         path: &Path<PortableForm>,
         root_mod_ident: Ident,
         params: Vec<TypePath>,
+        alloc_crate_path: &AllocCratePath,
     ) -> Self {
         let path_segments = &*path.segments;
 
@@ -190,9 +196,9 @@ impl TypePathType {
                 match ident.as_str() {
                     "Option" => parse_quote!(::core::option::Option),
                     "Result" => parse_quote!(::core::result::Result),
-                    "Cow" => parse_quote!(::std::borrow::Cow),
-                    "BTreeMap" => parse_quote!(::std::collections::BTreeMap),
-                    "BTreeSet" => parse_quote!(::std::collections::BTreeSet),
+                    "Cow" => parse_quote!(#alloc_crate_path::borrow::Cow),
+                    "BTreeMap" => parse_quote!(#alloc_crate_path::collections::BTreeMap),
+                    "BTreeSet" => parse_quote!(#alloc_crate_path::collections::BTreeSet),
                     "Range" => parse_quote!(::core::ops::Range),
                     "RangeInclusive" => parse_quote!(::core::ops::RangeInclusive),
                     "NonZeroI8" => parse_quote!(::core::num::NonZeroI8),
@@ -274,32 +280,36 @@ impl TypePathType {
         )
     }
 
-    fn to_syn_type(&self) -> syn::Type {
+    fn to_syn_type(&self, alloc_crate_path: &AllocCratePath) -> syn::Type {
         match &self {
             TypePathType::Path { path, params } => {
                 let path = if params.is_empty() {
                     parse_quote! { #path }
                 } else {
+                    let params = params.iter().map(|e| e.to_syn_type(alloc_crate_path));
                     parse_quote! { #path< #( #params ),* > }
                 };
                 syn::Type::Path(path)
             }
             TypePathType::Vec { of } => {
-                let type_path = parse_quote! { ::std::vec::Vec<#of> };
+                let of = of.to_syn_type(alloc_crate_path);
+                let type_path = parse_quote! { #alloc_crate_path::vec::Vec<#of> };
                 syn::Type::Path(type_path)
             }
             TypePathType::Array { len, of } => {
+                let of = of.to_syn_type(alloc_crate_path);
                 let array = parse_quote! { [#of; #len] };
                 syn::Type::Array(array)
             }
             TypePathType::Tuple { elements } => {
+                let elements = elements.iter().map(|e| e.to_syn_type(alloc_crate_path));
                 let tuple = parse_quote! { (#( # elements, )* ) };
                 syn::Type::Tuple(tuple)
             }
             TypePathType::Primitive { def } => syn::Type::Path(match def {
                 TypeDefPrimitive::Bool => parse_quote!(::core::primitive::bool),
                 TypeDefPrimitive::Char => parse_quote!(::core::primitive::char),
-                TypeDefPrimitive::Str => parse_quote!(::std::string::String),
+                TypeDefPrimitive::Str => parse_quote!(#alloc_crate_path::string::String),
                 TypeDefPrimitive::U8 => parse_quote!(::core::primitive::u8),
                 TypeDefPrimitive::U16 => parse_quote!(::core::primitive::u16),
                 TypeDefPrimitive::U32 => parse_quote!(::core::primitive::u32),
@@ -318,6 +328,7 @@ impl TypePathType {
                 is_field,
                 compact_type_path,
             } => {
+                let inner = inner.to_syn_type(alloc_crate_path);
                 let path = if *is_field {
                     // compact fields can use the inner compact type directly and be annotated with
                     // the `compact` attribute e.g. `#[codec(compact)] my_compact_field: u128`
@@ -332,6 +343,8 @@ impl TypePathType {
                 bit_store_type,
                 decoded_bits_type_path,
             } => {
+                let bit_order_type = bit_order_type.to_syn_type(alloc_crate_path);
+                let bit_store_type = bit_store_type.to_syn_type(alloc_crate_path);
                 let type_path =
                     parse_quote! { #decoded_bits_type_path<#bit_store_type, #bit_order_type> };
                 syn::Type::Path(type_path)

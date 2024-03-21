@@ -1,5 +1,6 @@
 use derives::DerivesRegistry;
 use proc_macro2::Ident;
+use quote::{quote, ToTokens};
 use substitutes::TypeSubstitutes;
 use syn::parse_quote;
 
@@ -41,7 +42,26 @@ pub struct TypeGeneratorSettings {
     /// If None, use types from the `std` library like `String`, `Box`, `Vec` directly from the rust prelude.
     /// If set to some path, e.g. just "alloc", if `extern crate alloc;` is used, we use `alloc::string::String`,
     /// `alloc::vec::Vec` and `alloc::boxed::Box` instead.
-    pub alloc_crate_path: Option<syn::Path>,
+    pub alloc_crate_path: AllocCratePath,
+}
+
+/// Information about how to construct the type paths for types that need allocation, e.g.
+#[derive(Debug, Clone, Default)]
+pub enum AllocCratePath {
+    /// Equivalent to `AllocCratePath::Custom(quote!(::std))`. This is the default.
+    #[default]
+    Std,
+    /// Custom path to the alloc crate, e.g. ``
+    Custom(syn::Path),
+}
+
+impl ToTokens for AllocCratePath {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        match self {
+            AllocCratePath::Std => quote!(::std).to_tokens(tokens),
+            AllocCratePath::Custom(alloc_path) => alloc_path.to_tokens(tokens),
+        }
+    }
 }
 
 impl Default for TypeGeneratorSettings {
@@ -55,7 +75,7 @@ impl Default for TypeGeneratorSettings {
             compact_as_type_path: None,
             compact_type_path: None,
             insert_codec_attributes: false,
-            alloc_crate_path: None,
+            alloc_crate_path: Default::default(),
         }
     }
 }

@@ -77,7 +77,7 @@ pub(super) fn subxt_settings() -> TypeGeneratorSettings {
         insert_codec_attributes: true,
         compact_as_type_path: Some(parse_quote!(::subxt_path::ext::codec::CompactAs)),
         compact_type_path: Some(parse_quote!(::subxt_path::ext::codec::Compact)),
-        alloc_crate_path: None,
+        alloc_crate_path: Default::default(),
     }
 }
 /// Derives mirroring the subxt default derives

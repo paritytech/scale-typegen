@@ -296,14 +296,10 @@ impl CompositeIR {
 
 impl ToTokensWithSettingsT for CompositeFieldIR {
     fn to_tokens(&self, tokens: &mut TokenStream, settings: &TypeGeneratorSettings) {
-        let ty_path = &self.type_path;
+        let ty_path = &self.type_path.to_syn_type(&settings.alloc_crate_path);
         if self.is_boxed {
-            let box_path = if let Some(alloc_crate) = &settings.alloc_crate_path {
-                quote! { #alloc_crate::boxed::Box }
-            } else {
-                quote! { ::std::boxed::Box }
-            };
-            tokens.extend(quote! { #box_path<#ty_path> })
+            let alloc_path = &settings.alloc_crate_path;
+            tokens.extend(quote! { #alloc_path::boxed::Box<#ty_path> })
         } else {
             tokens.extend(quote! { #ty_path })
         }

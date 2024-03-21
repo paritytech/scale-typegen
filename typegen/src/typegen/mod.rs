@@ -465,6 +465,7 @@ impl<'a> TypeGenerator<'a> {
                 path,
                 self.settings.types_mod_ident.clone(),
                 params.to_vec(),
+                &self.settings.alloc_crate_path,
             )
         }
     }

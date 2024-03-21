@@ -35,6 +35,6 @@ where
     T: ToTokensWithSettingsT,
 {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        self.val.to_tokens(tokens, &self.settings)
+        self.val.to_tokens(tokens, self.settings)
     }
 }
