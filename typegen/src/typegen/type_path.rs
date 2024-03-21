@@ -10,7 +10,7 @@ use syn::parse_quote;
 
 use crate::TypeGeneratorSettings;
 
-use super::ir::ToTokensWithSettingsT;
+use super::ir::ToTokensWithSettings;
 use super::settings::AllocCratePath;
 
 /// An opaque struct representing a type path. The main usage of this is
@@ -28,7 +28,7 @@ pub enum TypePathInner {
     Type(TypePathType),
 }
 
-impl ToTokensWithSettingsT for TypePath {
+impl ToTokensWithSettings for TypePath {
     fn to_tokens(&self, tokens: &mut TokenStream, settings: &TypeGeneratorSettings) {
         let syn_type = self.to_syn_type(&settings.alloc_crate_path);
         syn_type.to_tokens(tokens)

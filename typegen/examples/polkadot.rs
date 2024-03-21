@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use parity_scale_codec::Decode;
 use proc_macro2::TokenStream;
 use scale_info::PortableRegistry;
-use scale_typegen::{typegen::ir::ToTokensWithSettingsT, TypeGenerator, TypeGeneratorSettings};
+use scale_typegen::{typegen::ir::ToTokensWithSettings, TypeGenerator, TypeGeneratorSettings};
 use syn::parse_quote;
 
 #[allow(unused)]

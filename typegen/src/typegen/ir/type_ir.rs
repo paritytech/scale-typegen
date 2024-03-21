@@ -9,8 +9,6 @@ use crate::{
     TypeGeneratorSettings,
 };
 
-use super::ToTokensWithSettingsT;
-
 /// Intermediate Representation of a Rust type.
 #[derive(Debug, Clone)]
 pub struct TypeIR {
@@ -139,7 +137,7 @@ impl CompositeFieldIR {
     }
 }
 
-impl ToTokensWithSettingsT for TypeIR {
+impl ToTokensWithSettings for TypeIR {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream, settings: &TypeGeneratorSettings) {
         let derives = &self.derives;
         let type_params = &self.type_params;
@@ -227,7 +225,7 @@ impl CompositeIR {
             CompositeIRKind::Named(fields) => {
                 let fields = fields.iter().map(|(name, field)| {
                     let compact_attr = field.compact_attr().filter(|_| insert_codec_attributes);
-                    let field = ToTokensWithSettings::new(field, settings);
+                    let field = field.to_token_stream(settings);
                     quote! { #compact_attr pub #name: #field }
                 });
                 let marker = phantom_data.map(|phantom_data| {
@@ -247,7 +245,7 @@ impl CompositeIR {
             CompositeIRKind::Unnamed(fields) => {
                 let fields = fields.iter().map(|field| {
                     let compact_attr = field.compact_attr().filter(|_| insert_codec_attributes);
-                    let field = ToTokensWithSettings::new(field, settings);
+                    let field = field.to_token_stream(settings);
                     quote! { #compact_attr pub #field }
                 });
                 let marker = phantom_data.map(|phantom_data| {
@@ -277,7 +275,7 @@ impl CompositeIR {
             CompositeIRKind::Named(ref fields) => {
                 let fields = fields.iter().map(|(name, field)| {
                     let compact_attr = field.compact_attr().filter(|_| insert_codec_attributes);
-                    let field = ToTokensWithSettings::new(field, settings);
+                    let field = field.to_token_stream(settings);
                     quote! { #compact_attr #name: #field }
                 });
                 quote!( { #( #fields, )* } )
@@ -285,7 +283,7 @@ impl CompositeIR {
             CompositeIRKind::Unnamed(ref fields) => {
                 let fields = fields.iter().map(|field| {
                     let compact_attr = field.compact_attr().filter(|_| insert_codec_attributes);
-                    let field = ToTokensWithSettings::new(field, settings);
+                    let field = field.to_token_stream(settings);
                     quote! { #compact_attr #field }
                 });
                 quote! { ( #( #fields, )* ) }
@@ -294,7 +292,7 @@ impl CompositeIR {
     }
 }
 
-impl ToTokensWithSettingsT for CompositeFieldIR {
+impl ToTokensWithSettings for CompositeFieldIR {
     fn to_tokens(&self, tokens: &mut TokenStream, settings: &TypeGeneratorSettings) {
         let ty_path = &self.type_path.to_syn_type(&settings.alloc_crate_path);
         if self.is_boxed {

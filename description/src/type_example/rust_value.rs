@@ -4,7 +4,7 @@ use proc_macro2::{TokenStream, TokenTree};
 use quote::{format_ident, quote};
 use rand::{seq::SliceRandom, SeedableRng};
 use scale_info::{form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeDefPrimitive};
-use scale_typegen::{typegen::ir::ToTokensWithSettingsT, TypeGenerator, TypeGeneratorSettings};
+use scale_typegen::{typegen::ir::ToTokensWithSettings, TypeGenerator, TypeGeneratorSettings};
 use std::cell::RefCell;
 
 /// A transformer capable of converting a [`scale_info::Type`] from a type registry into

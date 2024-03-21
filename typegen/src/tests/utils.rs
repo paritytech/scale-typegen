@@ -6,7 +6,7 @@ use scale_info::{PortableRegistry, TypeInfo};
 use syn::parse_quote;
 
 use crate::typegen::ir::module_ir::ModuleIR;
-use crate::typegen::ir::ToTokensWithSettingsT;
+use crate::typegen::ir::ToTokensWithSettings;
 use crate::utils::ensure_unique_type_paths;
 use crate::TypegenError;
 use crate::{

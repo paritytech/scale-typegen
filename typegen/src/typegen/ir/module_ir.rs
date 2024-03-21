@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use crate::TypeGeneratorSettings;
 
 use super::type_ir::TypeIR;
-use super::{ToTokensWithSettings, ToTokensWithSettingsT};
+use super::ToTokensWithSettings;
 use proc_macro2::Span;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
@@ -23,18 +23,18 @@ pub struct ModuleIR<'a> {
         BTreeMap<scale_info::Path<PortableForm>, (&'a scale_info::Type<PortableForm>, TypeIR)>,
 }
 
-impl<'a> ToTokensWithSettingsT for ModuleIR<'a> {
+impl<'a> ToTokensWithSettings for ModuleIR<'a> {
     fn to_tokens(&self, tokens: &mut TokenStream, settings: &TypeGeneratorSettings) {
         let name = &self.name;
         let root_mod = &self.root_mod;
         let modules = self
             .children
             .values()
-            .map(|v| ToTokensWithSettings::new(v, settings));
+            .map(|ir| ir.to_token_stream(settings));
         let types = self
             .types
             .values()
-            .map(|e| ToTokensWithSettings::new(&e.1, settings))
+            .map(|(_, ir)| ir.to_token_stream(settings))
             .clone();
 
         tokens.extend(quote! {
