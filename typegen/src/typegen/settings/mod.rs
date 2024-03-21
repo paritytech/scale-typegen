@@ -51,7 +51,8 @@ pub enum AllocCratePath {
     /// Equivalent to `AllocCratePath::Custom(quote!(::std))`. This is the default.
     #[default]
     Std,
-    /// Custom path to the alloc crate, e.g. ``
+    /// Custom path to the alloc crate, e.g. `::alloc` if `extern crate alloc;` is used
+    /// or e.g. `::subxt_core::alloc` if the alloc crate is exported from another crate.
     Custom(syn::Path),
 }
 
