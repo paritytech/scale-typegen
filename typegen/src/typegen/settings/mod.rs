@@ -51,6 +51,9 @@ pub enum AllocCratePath {
     Std,
     /// Custom path to the alloc crate, e.g. `::alloc` if `extern crate alloc;` is used
     /// or e.g. `::subxt_core::alloc` if the alloc crate is exported from another crate.
+    ///
+    /// We'd expect the Custom path to export `vec::Vec`, `string::String`, `boxed::Box`
+    /// and `collections::BTreeMap`.
     Custom(syn::Path),
 }
 

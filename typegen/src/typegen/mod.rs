@@ -454,10 +454,10 @@ impl<'a> TypeGenerator<'a> {
         path: &scale_info::Path<PortableForm>,
         params: &[TypePath],
     ) -> TypePathType {
-        if let Some(substitute) = self
-            .settings
-            .substitutes
-            .for_path_with_params(&path.segments, params)
+        if let Some(substitute) =
+            self.settings
+                .substitutes
+                .for_path_with_params(&path.segments, params, self.settings)
         {
             substitute
         } else {
