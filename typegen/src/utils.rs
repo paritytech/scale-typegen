@@ -58,10 +58,7 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
         let mut n = 1;
         for group_with_same_shape in groups_with_same_path {
             for ty_id in group_with_same_shape {
-                let ty = types
-                    .types
-                    .get_mut(ty_id as usize)
-                    .expect("type is present; qed;");
+                let ty = types.types.get_mut(ty_id).expect("type is present; qed;");
                 let name = ty.ty.path.segments.last_mut().expect("This is only empty for builtin types, that are filtered out with namespace().is_empty() above; qed;");
                 *name = format!("{name}{n}"); // e.g. Header1, Header2, Header3, ...
             }
