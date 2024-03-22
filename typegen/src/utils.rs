@@ -13,13 +13,10 @@ pub fn syn_type_path(ty: &Type<PortableForm>) -> Result<syn::TypePath, TypegenEr
 
 /// Deduplicates type paths in the provided Registry.
 pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
-    let mut types_with_same_type_path_grouped_by_shape =
-        HashMap::<&[String], Vec<Vec<usize>>>::new();
+    let mut types_with_same_type_path_grouped_by_shape = HashMap::<&[String], Vec<Vec<u32>>>::new();
 
     // First, group types if they are similar (same path, same shape).
-    for (ty_idx, ty) in types.types.iter().enumerate() {
-        // Note: ty_idx and ty.id might be different
-
+    for ty in types.types.iter() {
         // Ignore types without a path (i.e prelude types).
         if ty.ty.path.namespace().is_empty() {
             continue;
@@ -34,9 +31,11 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
         let mut added_to_existing_group = false;
         for group in groups_with_same_path.iter_mut() {
             let other_ty_in_group_idx = group[0]; // all types in group are same shape; just check any one of them.
-            let other_ty_in_group = types.types.get(other_ty_in_group_idx).expect("ty exists");
-            if types_equal_extended_to_params(&ty.ty, &other_ty_in_group.ty) {
-                group.push(ty_idx);
+            let other_ty_in_group = types
+                .resolve(other_ty_in_group_idx)
+                .expect("type is present; qed;");
+            if types_equal_extended_to_params(&ty.ty, &other_ty_in_group) {
+                group.push(ty.id);
                 added_to_existing_group = true;
                 break;
             }
@@ -44,7 +43,7 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
 
         // We didn't find a matching group, so add it to a new one.
         if !added_to_existing_group {
-            groups_with_same_path.push(vec![ty_idx])
+            groups_with_same_path.push(vec![ty.id])
         }
     }
 
@@ -58,7 +57,10 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
         let mut n = 1;
         for group_with_same_shape in groups_with_same_path {
             for ty_id in group_with_same_shape {
-                let ty = types.types.get_mut(ty_id).expect("type is present; qed;");
+                let ty = types
+                    .types
+                    .get_mut(ty_id as usize)
+                    .expect("type is present; qed;");
                 let name = ty.ty.path.segments.last_mut().expect("This is only empty for builtin types, that are filtered out with namespace().is_empty() above; qed;");
                 *name = format!("{name}{n}"); // e.g. Header1, Header2, Header3, ...
             }
