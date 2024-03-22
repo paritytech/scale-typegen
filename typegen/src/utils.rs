@@ -13,11 +13,13 @@ pub fn syn_type_path(ty: &Type<PortableForm>) -> Result<syn::TypePath, TypegenEr
 
 /// Deduplicates type paths in the provided Registry.
 pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
-    let mut types_with_same_type_path_grouped_by_shape = HashMap::<&[String], Vec<Vec<u32>>>::new();
+    let mut types_with_same_type_path_grouped_by_shape =
+        HashMap::<&[String], Vec<Vec<usize>>>::new();
 
     // First, group types if they are similar (same path, same shape).
+    for (ty_idx, ty) in types.types.iter().enumerate() {
+        // Note: ty_idx and ty.id might be different
 
-    for (ty_id, ty) in types.types.iter().enumerate() {
         // Ignore types without a path (i.e prelude types).
         if ty.ty.path.namespace().is_empty() {
             continue;
@@ -31,10 +33,10 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
         // Compare existing groups to check which to add our type ID to.
         let mut added_to_existing_group = false;
         for group in groups_with_same_path.iter_mut() {
-            let ty_id_b = group[0]; // all types in group are same shape; just check any one of them.
-            let ty_b = types.resolve(ty_id_b).expect("ty exists");
-            if types_equal_extended_to_params(&ty.ty, ty_b) {
-                group.push(ty.id);
+            let other_ty_in_group_idx = group[0]; // all types in group are same shape; just check any one of them.
+            let other_ty_in_group = types.types.get(other_ty_in_group_idx).expect("ty exists");
+            if types_equal_extended_to_params(&ty.ty, &other_ty_in_group.ty) {
+                group.push(ty_idx);
                 added_to_existing_group = true;
                 break;
             }
@@ -42,7 +44,7 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
 
         // We didn't find a matching group, so add it to a new one.
         if !added_to_existing_group {
-            groups_with_same_path.push(vec![ty_id as u32])
+            groups_with_same_path.push(vec![ty_idx])
         }
     }
 

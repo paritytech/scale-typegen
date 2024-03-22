@@ -1,3 +1,7 @@
+# [0.4.1] - 2024-03-22
+
+- Fix type id resolving in `scale_typegen::utils::ensure_unique_type_paths` for cases where a type's index and id do not line up.
+
 # [0.4.0] - 2024-03-21
 
 - Fix logic bug in `scale_typegen::utils::ensure_unique_type_paths`.
