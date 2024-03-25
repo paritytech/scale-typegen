@@ -6,24 +6,22 @@ resolver = "2"
 [workspace.package]
 authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2021"
-version = "0.4.0"
+version = "0.4.1"
 rust-version = "1.70.0"
 license = "Apache-2.0 OR GPL-3.0"
 repository = "https://github.com/paritytech/scale-typegen"
 homepage = "https://www.parity.io/"
 
-
 [workspace.dependencies]
-
-scale-typegen-description = { version = "0.4.0", path = "description" }
-scale-typegen = { version = "0.4.0", path = "typegen" }
+scale-typegen-description = { version = "0.4.1", path = "description" }
+scale-typegen = { version = "0.4.1", path = "typegen" }
 
 # external dependencies
 parity-scale-codec = { version = "3.6.5", features = ["derive"] }
 proc-macro2 = "1.0.69"
 quote = "1.0.33"
 scale-bits = "0.5.0"
-scale-info = { version = "2.10.0", features = ["derive", "bit-vec", "decode", "docs", "serde"] }
+scale-info = { version = "2.11.1", features = ["derive", "bit-vec", "decode", "docs", "serde"] }
 smallvec = "1.10.0"
 syn = { version = "2.0.38", features = ["full", "extra-traits"] }
 thiserror = "1.0.50"
