@@ -34,7 +34,7 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
             let other_ty_in_group = types
                 .resolve(other_ty_in_group_idx)
                 .expect("type is present; qed;");
-            if types_equal_extended_to_params(&ty.ty, &other_ty_in_group) {
+            if types_equal_extended_to_params(&ty.ty, other_ty_in_group) {
                 group.push(ty.id);
                 added_to_existing_group = true;
                 break;
