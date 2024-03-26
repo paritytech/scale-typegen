@@ -1,3 +1,7 @@
+# [0.4.2] - 2024-03-26
+
+- Revert some code simplification in 0.4.1 so that older metadata (built with scale-info versions prior to 2.11.1 and using the `retain()` method) is more likely to work.
+
 # [0.4.1] - 2024-03-22
 
 - Bump `scale-info` to 2.11.1 to fix an issue in `scale_typegen::utils::ensure_unique_type_paths` for cases where a type's index and id do not line up, and simplify code a touch.
