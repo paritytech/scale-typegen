@@ -16,15 +16,22 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
     let mut types_with_same_type_path_grouped_by_shape = HashMap::<&[String], Vec<Vec<u32>>>::new();
 
     // First, group types if they are similar (same path, same shape).
-    for ty in types.types.iter() {
+    for (ty_idx, ty) in types.types.iter().enumerate() {
+        // We use the index of the type in the types registry instead of `ty.id`. The two
+        // _should_ be identical, but prior to `scale-info` 2.11.1  they sometimes weren't
+        // when `registry.retain()` was used, and so to avoid older metadata files breaking
+        // things, let's stick to using the index for a while:
+        let ty_idx = ty_idx as u32;
+        let ty = &ty.ty;
+
         // Ignore types without a path (i.e prelude types).
-        if ty.ty.path.namespace().is_empty() {
+        if ty.path.namespace().is_empty() {
             continue;
         };
 
         // get groups that share this path already, if any.
         let groups_with_same_path = types_with_same_type_path_grouped_by_shape
-            .entry(&ty.ty.path.segments)
+            .entry(&ty.path.segments)
             .or_default();
 
         // Compare existing groups to check which to add our type ID to.
@@ -33,9 +40,9 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
             let other_ty_in_group_idx = group[0]; // all types in group are same shape; just check any one of them.
             let other_ty_in_group = types
                 .resolve(other_ty_in_group_idx)
-                .expect("type is present; qed;");
-            if types_equal_extended_to_params(&ty.ty, other_ty_in_group) {
-                group.push(ty.id);
+                .expect("type is present (1); qed;");
+            if types_equal_extended_to_params(ty, other_ty_in_group) {
+                group.push(ty_idx);
                 added_to_existing_group = true;
                 break;
             }
@@ -43,7 +50,7 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
 
         // We didn't find a matching group, so add it to a new one.
         if !added_to_existing_group {
-            groups_with_same_path.push(vec![ty.id])
+            groups_with_same_path.push(vec![ty_idx])
         }
     }
 
@@ -60,7 +67,7 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
                 let ty = types
                     .types
                     .get_mut(ty_id as usize)
-                    .expect("type is present; qed;");
+                    .expect("type is present (2); qed;");
                 let name = ty.ty.path.segments.last_mut().expect("This is only empty for builtin types, that are filtered out with namespace().is_empty() above; qed;");
                 *name = format!("{name}{n}"); // e.g. Header1, Header2, Header3, ...
             }
