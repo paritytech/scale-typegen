@@ -190,9 +190,12 @@ impl TypePathType {
                 match ident.as_str() {
                     "Option" => parse_quote!(::core::option::Option),
                     "Result" => parse_quote!(::core::result::Result),
-                    "Cow" => parse_quote!(::std::borrow::Cow),
+                    "Cow" => parse_quote!(::std::collections::Cow),
                     "BTreeMap" => parse_quote!(::std::collections::BTreeMap),
                     "BTreeSet" => parse_quote!(::std::collections::BTreeSet),
+                    "BinaryHeap" => parse_quote!(::std::collections::BinaryHeap),
+                    "VecDeque" => parse_quote!(::std::collections::VecDeque),
+                    "LinkedList" => parse_quote!(::std::collections::LinkedList),
                     "Range" => parse_quote!(::core::ops::Range),
                     "RangeInclusive" => parse_quote!(::core::ops::RangeInclusive),
                     "NonZeroI8" => parse_quote!(::core::num::NonZeroI8),
