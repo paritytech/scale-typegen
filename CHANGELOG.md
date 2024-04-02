@@ -1,3 +1,7 @@
+# [0.2.1] - 2024-04-02
+
+This release that adds support the builtin types `BinaryHeap`, `LinkedList` and `VecDeque`.
+
 # [0.2.0] - 2024-03-01
 
 - bumped dependencies of `scale-*` crates.
