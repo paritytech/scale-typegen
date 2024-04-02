@@ -1,3 +1,7 @@
+# [0.4.3] - 2024-04-02
+
+This release that adds support for the builtin types `BinaryHeap`, `LinkedList` and `VecDeque`.
+
 # [0.4.2] - 2024-03-26
 
 - Revert some code simplification in 0.4.1 so that older metadata (built with scale-info versions prior to 2.11.1 and using the `retain()` method) is more likely to work.
