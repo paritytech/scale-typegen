@@ -1,3 +1,7 @@
+# [0.5.0] - 2024-04-29
+
+- Bump `scale-*` dependencies to latest to bring in `scale-type-resolver` 0.2.
+
 # [0.4.3] - 2024-04-02
 
 This release that adds support for the builtin types `BinaryHeap`, `LinkedList` and `VecDeque`.
