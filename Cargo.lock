@@ -347,9 +347,9 @@ dependencies = [
 
 [[package]]
 name = "scale-bits"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "662d10dcd57b1c2a3c41c9cf68f71fb09747ada1ea932ad961aca7e2ca28315f"
+checksum = "e57b1e7f6b65ed1f04e79a85a57d755ad56d76fdf1e9bddcc9ae14f71fcdcf54"
 dependencies = [
  "parity-scale-codec",
  "scale-info",
@@ -359,9 +359,9 @@ dependencies = [
 
 [[package]]
 name = "scale-decode"
-version = "0.11.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afc79ba56a1c742f5aeeed1f1801f3edf51f7e818f0a54582cac6f131364ea7b"
+checksum = "7e10e0d345101a013ca3af62c2d44d20213d543cc64d96080c68d931e54360c5"
 dependencies = [
  "derive_more",
  "parity-scale-codec",
@@ -372,9 +372,9 @@ dependencies = [
 
 [[package]]
 name = "scale-encode"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "628800925a33794fb5387781b883b5e14d130fece9af5a63613867b8de07c5c7"
+checksum = "ac89c68dd1142f71a5b97850b9031e9a0d3ce708f5de5e7234cddb3b6fc7c8db"
 dependencies = [
  "derive_more",
  "parity-scale-codec",
@@ -411,9 +411,9 @@ dependencies = [
 
 [[package]]
 name = "scale-type-resolver"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10b800069bfd43374e0f96f653e0d46882a2cb16d6d961ac43bea80f26c76843"
+checksum = "f0cded6518aa0bd6c1be2b88ac81bf7044992f0f154bfbabd5ad34f43512abcb"
 dependencies = [
  "scale-info",
  "smallvec",
@@ -421,7 +421,7 @@ dependencies = [
 
 [[package]]
 name = "scale-typegen"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "bitvec",
  "frame-metadata 16.0.0",
@@ -439,7 +439,7 @@ dependencies = [
 
 [[package]]
 name = "scale-typegen-description"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "indoc",
@@ -459,9 +459,9 @@ dependencies = [
 
 [[package]]
 name = "scale-value"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85c518ab8d2f3d6625f651409d4d223ebea8517fc41cd9814c1ab892f8f259a5"
+checksum = "0c9e20eb2f3b02cb16f7ccb575c599f4624567c9ad58206d61995e7fc2a0efb7"
 dependencies = [
  "base58",
  "blake2",
