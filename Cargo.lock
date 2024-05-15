@@ -359,9 +359,9 @@ dependencies = [
 
 [[package]]
 name = "scale-decode"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e10e0d345101a013ca3af62c2d44d20213d543cc64d96080c68d931e54360c5"
+checksum = "b12ebca36cec2a3f983c46295b282b35e5f8496346fb859a8776dad5389e5389"
 dependencies = [
  "derive_more",
  "parity-scale-codec",
@@ -421,7 +421,7 @@ dependencies = [
 
 [[package]]
 name = "scale-typegen"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bitvec",
  "frame-metadata 16.0.0",
@@ -439,7 +439,7 @@ dependencies = [
 
 [[package]]
 name = "scale-typegen-description"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "indoc",
@@ -459,9 +459,9 @@ dependencies = [
 
 [[package]]
 name = "scale-value"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c9e20eb2f3b02cb16f7ccb575c599f4624567c9ad58206d61995e7fc2a0efb7"
+checksum = "f2cf9738c263c665144177201126bdad39d3d62512152f178f35002228026976"
 dependencies = [
  "base58",
  "blake2",
