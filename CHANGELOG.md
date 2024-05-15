@@ -1,3 +1,7 @@
+# [0.6.0] - 2024-05-15
+
+- Bump `scale-decode` to 0.13.0.
+
 # [0.5.0] - 2024-04-29
 
 - Bump `scale-*` dependencies to latest to bring in `scale-type-resolver` 0.2.
