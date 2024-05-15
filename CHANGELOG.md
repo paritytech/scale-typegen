@@ -1,3 +1,7 @@
+# [0.7.0] - 2024-05-15
+
+- Bump `scale-value` to 0.16.0, in order to have only one `scale-decode` in the hierarchy.
+
 # [0.6.0] - 2024-05-15
 
 - Bump `scale-decode` to 0.13.0.
