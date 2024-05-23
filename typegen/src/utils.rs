@@ -144,7 +144,7 @@ fn types_equal_inner(
     let b_ty = types.resolve(b).expect("type b should exist in registry");
 
     // Paths differ; types won't be equal then!
-    if &a_ty.path.segments != &b_ty.path.segments {
+    if a_ty.path.segments != b_ty.path.segments {
         return false;
     }
 
