@@ -178,7 +178,7 @@ pub(super) fn subxt_default_substitutes() -> TypeSubstitutes {
 
 const TESTS_MOD_PATH: &[&str] = &["scale_typegen", "tests"];
 
-fn get_mod<'a>(module: &'a ModuleIR, path_segs: &[&'static str]) -> Option<&'a ModuleIR<'a>> {
+fn get_mod<'a>(module: &'a ModuleIR, path_segs: &[&'static str]) -> Option<&'a ModuleIR> {
     let (mod_name, rest) = path_segs.split_first()?;
     let mod_ident: Ident = syn::parse_str(mod_name).unwrap();
     let module = module.children.get(&mod_ident)?;

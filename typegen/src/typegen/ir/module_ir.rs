@@ -11,19 +11,18 @@ use scale_info::form::PortableForm;
 
 /// Represents a Rust `mod`, containing generated types and child `mod`s.
 #[derive(Debug, Clone)]
-pub struct ModuleIR<'a> {
+pub struct ModuleIR {
     /// Name of this module.
     pub name: Ident,
     /// Root module identifier.
     pub root_mod: Ident,
     /// Submodules of this module.
-    pub children: BTreeMap<Ident, ModuleIR<'a>>,
+    pub children: BTreeMap<Ident, ModuleIR>,
     /// Types in this module.
-    pub types:
-        BTreeMap<scale_info::Path<PortableForm>, (&'a scale_info::Type<PortableForm>, TypeIR)>,
+    pub types: BTreeMap<scale_info::Path<PortableForm>, (u32, TypeIR)>,
 }
 
-impl<'a> ToTokensWithSettings for ModuleIR<'a> {
+impl ToTokensWithSettings for ModuleIR {
     fn to_tokens(&self, tokens: &mut TokenStream, settings: &TypeGeneratorSettings) {
         let name = &self.name;
         let root_mod = &self.root_mod;
@@ -48,7 +47,7 @@ impl<'a> ToTokensWithSettings for ModuleIR<'a> {
     }
 }
 
-impl<'a> ModuleIR<'a> {
+impl ModuleIR {
     /// Create a new [`Module`], with a reference to the root `mod` for resolving type paths.
     pub(crate) fn new(name: Ident, root_mod: Ident) -> Self {
         Self {
@@ -81,7 +80,7 @@ impl<'a> ModuleIR<'a> {
 
     /// Recursively creates submodules for the given namespace and returns a mutable reference to the innermost module created this way.
     /// Returns itself, if the namespace is empty.
-    pub fn get_or_insert_submodule(&mut self, namespace: &[String]) -> &mut ModuleIR<'a> {
+    pub fn get_or_insert_submodule(&mut self, namespace: &[String]) -> &mut ModuleIR {
         if namespace.is_empty() {
             return self;
         }
