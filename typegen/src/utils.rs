@@ -73,13 +73,15 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
     }
 }
 
-/// This attempts to check whether two types are equal.
+/// This attempts to check whether two types are equal in terms of their shape.
+/// In other words: should we de-duplicate these types during codegen.
 ///
-/// It recurses through types, keeping track of any generic parameters we've seen so far
-/// such that it can attempt to map seen type IDs back to generic parameters if they aren't
-/// already equal.
-///
-/// It also checks that the name, param names and shape all lines up between two types.
+/// The basic algorithm here is:
+/// - If type IDs match, they are the same.
+/// - If type IDs can be explained by the same generic parameter, they are the same.
+/// - If type paths or generic names don't match, they are different.
+/// - If the corresponding TypeDefs (shape of type) is different, they are different.
+/// - Else, recurse through any contained type IDs and start from the top.
 pub(crate) fn types_equal(a: u32, b: u32, types: &PortableRegistry) -> bool {
     let mut a_visited = HashSet::new();
     let mut b_visited = HashSet::new();
