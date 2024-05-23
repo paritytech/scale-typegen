@@ -14,7 +14,6 @@ quote = { workspace = true }
 scale-info = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
-smallvec = { workspace = true }
 
 [dev-dependencies]
 scale-bits = { workspace = true }

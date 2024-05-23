@@ -432,7 +432,6 @@ dependencies = [
  "quote",
  "scale-bits",
  "scale-info",
- "smallvec",
  "syn 2.0.60",
  "thiserror",
 ]
