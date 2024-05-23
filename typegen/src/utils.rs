@@ -76,10 +76,10 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
 /// This attempts to check whether two types are equal.
 ///
 /// It recurses through types, keeping track of any generic parameters we've seen so far
-/// such that it can attempt to map seen type IDs back to generic parameters if they aren'T
+/// such that it can attempt to map seen type IDs back to generic parameters if they aren't
 /// already equal.
 ///
-/// It also checks that the name, param names and shape all lines up bewteen two types.
+/// It also checks that the name, param names and shape all lines up between two types.
 pub(crate) fn types_equal(a: u32, b: u32, types: &PortableRegistry) -> bool {
     let mut a_visited = HashSet::new();
     let mut b_visited = HashSet::new();
@@ -170,11 +170,13 @@ fn types_equal_inner(
         };
 
     // Check that all of the fields of some type are equal.
-    let mut fields_equal = |a: &[Field<PortableForm>],
-                            a_params: &GenericsList,
-                            b: &[Field<PortableForm>],
-                            b_params: &GenericsList|
-     -> bool {
+    #[rustfmt::skip]
+    let mut fields_equal = |
+        a: &[Field<PortableForm>],
+        a_params: &GenericsList,
+        b: &[Field<PortableForm>],
+        b_params: &GenericsList
+    | -> bool {
         if a.len() != b.len() {
             return false;
         }
@@ -316,7 +318,11 @@ mod generics_list {
 
 #[cfg(test)]
 mod tests {
+    use crate::typegen::ir::ToTokensWithSettings;
+    use pretty_assertions::assert_eq;
+
     use super::*;
+    use quote::quote;
     use scale_info::{
         meta_type, Field, Path, PortableRegistry, TypeDef, TypeDefComposite, TypeInfo,
         TypeParameter,
@@ -440,7 +446,7 @@ mod tests {
         let id_d = registry.register_type(&meta_type::<D>()).id;
         let id_e = registry.register_type(&meta_type::<E>()).id;
         let id_f = registry.register_type(&meta_type::<F>()).id;
-        let registry = PortableRegistry::from(registry);
+        let mut registry = PortableRegistry::from(registry);
 
         // Despite how many layers of nesting, we identify that the generic
         // param can explain the difference, so can see them as being equal.
@@ -448,9 +454,53 @@ mod tests {
         assert!(types_equal(id_c, id_d, &registry));
         assert!(types_equal(id_e, id_f, &registry));
 
-        // Sanity check that the pairs are not equal with eachother.
+        // Sanity check that the pairs are not equal with each other.
         assert!(!types_equal(id_a, id_c, &registry));
         assert!(!types_equal(id_a, id_e, &registry));
         assert!(!types_equal(id_c, id_e, &registry));
+
+        // Now, check that the generated output is sane and in line with this...
+
+        ensure_unique_type_paths(&mut registry);
+        let settings = crate::TypeGeneratorSettings::new();
+        let output = crate::TypeGenerator::new(&registry, &settings)
+            .generate_types_mod()
+            .unwrap()
+            .to_token_stream(&settings);
+
+        // This isn't ideal, but I printed out the token stream, and it looks good (ie generates
+        // 3 types after deduplicating with the correct generic param usage), so this test will
+        // check that the output still looks good. To update, copy and `rustfmt` the new output
+        // and then adjust the odd thing until it matches again.
+        let expected = quote! {
+            pub mod types {
+                use super::types;
+                pub mod my {
+                    use super::types;
+                    pub mod module {
+                        use super::types;
+                        pub struct NestedType1<_0>(pub _0,);
+                        pub struct NestedType2<_0>(pub ::std::vec::Vec<_0>,);
+                        pub struct NestedType3<_0>(
+                            pub ::std::vec::Vec<types::scale_typegen::utils::tests::Foo<_0> >,
+                        );
+                    }
+                }
+                pub mod scale_typegen {
+                    use super::types;
+                    pub mod utils {
+                        use super::types;
+                        pub mod tests {
+                            use super::types;
+                            pub struct Foo<_0> {
+                                pub _inner: _0,
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        assert_eq!(output.to_string(), expected.to_string());
     }
 }
