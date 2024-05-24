@@ -1,6 +1,6 @@
-use scale_info::{form::PortableForm, Field, PortableRegistry, Type, TypeDef, TypeParameter};
-use smallvec::{smallvec, SmallVec};
-use std::collections::{hash_map::Entry, HashMap};
+use self::generics_list::GenericsList;
+use scale_info::{form::PortableForm, Field, PortableRegistry, Type, TypeDef};
+use std::collections::{HashMap, HashSet};
 
 use crate::TypegenError;
 
@@ -38,10 +38,7 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
         let mut added_to_existing_group = false;
         for group in groups_with_same_path.iter_mut() {
             let other_ty_in_group_idx = group[0]; // all types in group are same shape; just check any one of them.
-            let other_ty_in_group = types
-                .resolve(other_ty_in_group_idx)
-                .expect("type is present (1); qed;");
-            if types_equal_extended_to_params(ty, other_ty_in_group) {
+            if types_equal(ty_idx, other_ty_in_group_idx, types) {
                 group.push(ty_idx);
                 added_to_existing_group = true;
                 break;
@@ -76,110 +73,262 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
     }
 }
 
-/// This function checks if two types that have the same type path,
-/// should be considered as equal in terms of their structure and
-/// their use of generics.
-/// This is checked, because if they are indeed equal it is fine
-/// to generate a single rust type for the two registered typed.
-/// However if they are not equal, we need to deduplicate the type path.
-/// This means modifying the type path of one or both clashing types.
+/// This attempts to check whether two types are equal in terms of their shape.
+/// In other words: should we de-duplicate these types during codegen.
 ///
-/// So what types are considered equal?
-/// Types are equal, if their TypeDef is exactly the same.
-/// Types are also considered equal if the TypeDef has the same shape and
-/// all type ids mentioned in the TypeDef are either:
-/// - equal
-/// - or different, but map essentially to the same generic type parameter
-pub(crate) fn types_equal_extended_to_params(
-    a: &Type<PortableForm>,
-    b: &Type<PortableForm>,
+/// The basic algorithm here is:
+/// - If type IDs match, they are the same.
+/// - If type IDs can be explained by the same generic parameter, they are the same.
+/// - If type paths or generic names don't match, they are different.
+/// - If the corresponding TypeDefs (shape of type) is different, they are different.
+/// - Else, recurse through any contained type IDs and start from the top.
+pub(crate) fn types_equal(a: u32, b: u32, types: &PortableRegistry) -> bool {
+    let mut a_visited = HashSet::new();
+    let mut b_visited = HashSet::new();
+    types_equal_inner(
+        a,
+        &GenericsList::empty(),
+        &mut a_visited,
+        b,
+        &GenericsList::empty(),
+        &mut b_visited,
+        types,
+    )
+}
+
+// Panics if the given type ID is not found in the registry.
+fn types_equal_inner(
+    a: u32,
+    a_parent_params: &GenericsList,
+    a_visited: &mut HashSet<u32>,
+    b: u32,
+    b_parent_params: &GenericsList,
+    b_visited: &mut HashSet<u32>,
+    types: &PortableRegistry,
 ) -> bool {
-    // We map each type ID to all type params if could refer to. Type IDs can refer to multiple parameters:
-    // E.g. Foo<A,B> can be parameterized as Foo<u8,u8>, so if 42 is the type id of u8, a field with id=42 could refer to either A or B.
-    fn collect_params(
-        type_params: &[TypeParameter<PortableForm>],
-    ) -> HashMap<u32, SmallVec<[&str; 2]>> {
-        let mut hm: HashMap<u32, SmallVec<[&str; 2]>> = HashMap::new();
-        for p in type_params {
-            if let Some(ty) = &p.ty {
-                match hm.entry(ty.id) {
-                    Entry::Occupied(mut e) => {
-                        e.get_mut().push(p.name.as_str());
-                    }
-                    Entry::Vacant(e) => {
-                        e.insert(smallvec![p.name.as_str()]);
-                    }
-                }
-            }
-        }
-        hm
+    // IDs are the same; types must be identical!
+    if a == b {
+        return true;
     }
 
-    let type_params_a = collect_params(&a.type_params);
-    let type_params_b = collect_params(&b.type_params);
+    // Make note of these IDs in case we recurse and see them again.
+    let seen_a = !a_visited.insert(a);
+    let seen_b = !b_visited.insert(b);
 
-    if a.type_params.len() != b.type_params.len() {
+    // One type is recursive and the other isn't; they are different.
+    // If neither type is recursive, we keep checking.
+    if seen_a != seen_b {
         return false;
     }
-    // Returns true if the ids are the same OR if they point to the same generic parameter.
-    let ids_equal = |a: u32, b: u32| -> bool {
-        if a == b {
+
+    // Both types are recursive, and they look the same based on the above,
+    // so assume all is well, since we've already checked other things in prev recursion.
+    if seen_a && seen_b {
+        return true;
+    }
+
+    // Make note of whether these IDs (might) correspond to any specific generic.
+    let a_generic_idx = a_parent_params.index_for_type_id(a);
+    let b_generic_idx = b_parent_params.index_for_type_id(b);
+
+    // If both IDs map to same generic param, then we'll assume equal. If they don't
+    // then we need to keep checking other properties (eg Vec<bool> and Vec<u8> will have
+    // different type IDs but may be the same type if the bool+u8 line up to generic params).
+    if let (Some(a_idx), Some(b_idx)) = (a_generic_idx, b_generic_idx) {
+        if a_idx == b_idx {
             return true;
         }
-        let Some(a_param_names) = type_params_a.get(&a) else {
-            return false;
-        };
-        let Some(b_param_names) = type_params_b.get(&b) else {
-            return false;
-        };
-        // Check if there is any intersection, meaning that both IDs map to the same generic type param:
-        a_param_names.iter().any(|a_p| b_param_names.contains(a_p))
+    }
+
+    let a_ty = types.resolve(a).expect("type a should exist in registry");
+    let b_ty = types.resolve(b).expect("type b should exist in registry");
+
+    // Paths differ; types won't be equal then!
+    if a_ty.path.segments != b_ty.path.segments {
+        return false;
+    }
+
+    // Names of type params don't line up, so different then!
+    if a_ty
+        .type_params
+        .iter()
+        .zip(&b_ty.type_params)
+        .any(|(a, b)| a.name != b.name)
+    {
+        return false;
+    }
+
+    // We'll lazily extend our type params only if the shapes match.
+    let calc_params = || {
+        let a_params = a_parent_params.extend(&a_ty.type_params);
+        let b_params = b_parent_params.extend(&b_ty.type_params);
+        (a_params, b_params)
     };
 
-    let fields_equal = |a: &[Field<PortableForm>], b: &[Field<PortableForm>]| -> bool {
+    // Capture a few variables to avoid some repetition later when we recurse.
+    let mut types_equal_recurse =
+        |a: u32, a_params: &GenericsList, b: u32, b_params: &GenericsList| -> bool {
+            types_equal_inner(a, a_params, a_visited, b, b_params, b_visited, types)
+        };
+
+    // Check that all of the fields of some type are equal.
+    #[rustfmt::skip]
+    let mut fields_equal = |
+        a: &[Field<PortableForm>],
+        a_params: &GenericsList,
+        b: &[Field<PortableForm>],
+        b_params: &GenericsList
+    | -> bool {
         if a.len() != b.len() {
             return false;
         }
         a.iter().zip(b.iter()).all(|(a, b)| {
-            a.name == b.name && a.type_name == b.type_name && ids_equal(a.ty.id, b.ty.id)
+            a.name == b.name
+                && a.type_name == b.type_name
+                && types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params)
         })
     };
 
-    match (&a.type_def, &b.type_def) {
-        (TypeDef::Composite(a), TypeDef::Composite(b)) => fields_equal(&a.fields, &b.fields),
-        (TypeDef::Variant(a), TypeDef::Variant(b)) => {
-            a.variants.len() == b.variants.len()
-                && a.variants
-                    .iter()
-                    .zip(b.variants.iter())
-                    .all(|(a, b)| a.name == b.name && fields_equal(&a.fields, &b.fields))
+    // Check that the shape of the types and contents are equal.
+    match (&a_ty.type_def, &b_ty.type_def) {
+        (TypeDef::Composite(a), TypeDef::Composite(b)) => {
+            let (a_params, b_params) = calc_params();
+            fields_equal(&a.fields, &a_params, &b.fields, &b_params)
         }
-        (TypeDef::Sequence(a), TypeDef::Sequence(b)) => ids_equal(a.type_param.id, b.type_param.id),
+        (TypeDef::Variant(a), TypeDef::Variant(b)) => {
+            let (a_params, b_params) = calc_params();
+            a.variants.len() == b.variants.len()
+                && a.variants.iter().zip(b.variants.iter()).all(|(a, b)| {
+                    a.name == b.name && fields_equal(&a.fields, &a_params, &b.fields, &b_params)
+                })
+        }
+        (TypeDef::Sequence(a), TypeDef::Sequence(b)) => {
+            let (a_params, b_params) = calc_params();
+            types_equal_recurse(a.type_param.id, &a_params, b.type_param.id, &b_params)
+        }
         (TypeDef::Array(a), TypeDef::Array(b)) => {
-            a.len == b.len && ids_equal(a.type_param.id, b.type_param.id)
+            let (a_params, b_params) = calc_params();
+            a.len == b.len
+                && types_equal_recurse(a.type_param.id, &a_params, b.type_param.id, &b_params)
         }
         (TypeDef::Tuple(a), TypeDef::Tuple(b)) => {
+            let (a_params, b_params) = calc_params();
             a.fields.len() == b.fields.len()
                 && a.fields
                     .iter()
                     .zip(b.fields.iter())
-                    .all(|(a, b)| ids_equal(a.id, b.id))
+                    .all(|(a, b)| types_equal_recurse(a.id, &a_params, b.id, &b_params))
         }
         (TypeDef::Primitive(a), TypeDef::Primitive(b)) => a == b,
-        (TypeDef::Compact(a), TypeDef::Compact(b)) => ids_equal(a.type_param.id, b.type_param.id),
-        (TypeDef::BitSequence(a), scale_info::TypeDef::BitSequence(b)) => {
-            ids_equal(a.bit_order_type.id, b.bit_order_type.id)
-                && ids_equal(a.bit_store_type.id, b.bit_store_type.id)
+        (TypeDef::Compact(a), TypeDef::Compact(b)) => {
+            let (a_params, b_params) = calc_params();
+            types_equal_recurse(a.type_param.id, &a_params, b.type_param.id, &b_params)
         }
+        (TypeDef::BitSequence(a), scale_info::TypeDef::BitSequence(b)) => {
+            let (a_params, b_params) = calc_params();
+            let order_equal = types_equal_recurse(
+                a.bit_order_type.id,
+                &a_params,
+                b.bit_order_type.id,
+                &b_params,
+            );
+            let store_equal = types_equal_recurse(
+                a.bit_store_type.id,
+                &a_params,
+                b.bit_store_type.id,
+                &b_params,
+            );
+            order_equal && store_equal
+        }
+        // Type defs don't match; types aren't the same!
         _ => false,
+    }
+}
+
+/// Just a small helper for the [`types_equal_inner`] function, to track where generic params
+/// are in order to see whether different type IDs may actually be represented by the same generics.
+mod generics_list {
+    use scale_info::{form::PortableForm, TypeParameter};
+    use std::rc::Rc;
+
+    /// A list of generics by type ID. For a given type ID, we'll either
+    /// return the index of the first generic param we find that matches it,
+    /// or None. We can extend this list with more generics as we go.
+    #[derive(Clone, Debug)]
+    pub struct GenericsList {
+        inner: Rc<GenericsListInner>,
+    }
+
+    #[derive(Clone, Debug)]
+    struct GenericsListInner {
+        previous: Option<GenericsList>,
+        start_idx: usize,
+        generics_by_id: Vec<u32>,
+    }
+
+    impl GenericsList {
+        /// Return the unique index of a generic in the list, or None if not found
+        pub fn index_for_type_id(&self, type_id: u32) -> Option<usize> {
+            let maybe_index = self
+                .inner
+                .generics_by_id
+                .iter()
+                .enumerate()
+                .find(|(_, id)| **id == type_id)
+                .map(|(index, _)| self.inner.start_idx + index);
+
+            // if index isn't found here, go back to the previous list and try again.
+            maybe_index.or_else(|| {
+                self.inner
+                    .previous
+                    .as_ref()
+                    .and_then(|prev| prev.index_for_type_id(type_id))
+            })
+        }
+
+        /// Create an empty list.
+        pub fn empty() -> Self {
+            Self::new_inner(None, &[])
+        }
+
+        /// Extend this list with more params.
+        pub fn extend(&self, params: &[TypeParameter<PortableForm>]) -> Self {
+            Self::new_inner(Some(self.clone()), params)
+        }
+
+        fn new_inner(
+            maybe_self: Option<GenericsList>,
+            params: &[TypeParameter<PortableForm>],
+        ) -> Self {
+            let generics_by_id = params.iter().filter_map(|p| p.ty.map(|ty| ty.id)).collect();
+
+            let start_idx = match &maybe_self {
+                Some(list) => list.inner.start_idx + list.inner.generics_by_id.len(),
+                None => 0,
+            };
+
+            GenericsList {
+                inner: Rc::new(GenericsListInner {
+                    previous: maybe_self,
+                    start_idx,
+                    generics_by_id,
+                }),
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use scale_info::{meta_type, Path, PortableRegistry};
+    use crate::typegen::ir::ToTokensWithSettings;
+    use pretty_assertions::assert_eq;
 
-    use crate::utils::ensure_unique_type_paths;
+    use super::*;
+    use quote::quote;
+    use scale_info::{
+        meta_type, Field, Path, PortableRegistry, TypeDef, TypeDefComposite, TypeInfo,
+        TypeParameter,
+    };
 
     #[test]
     fn ensure_unique_type_paths_test() {
@@ -237,5 +386,123 @@ mod tests {
         assert_eq!(ident(id_4), "Foo3");
         assert_eq!(ident(id_5), "Foo3");
         assert_eq!(ident(id_6), "Foo3");
+    }
+
+    #[test]
+    fn types_equal_recursing_test() {
+        #[derive(TypeInfo)]
+        struct Foo<T> {
+            _inner: T,
+        }
+
+        macro_rules! nested_type {
+            ($ty:ident, $generic:ty, $inner:ty) => {
+                struct $ty;
+                impl scale_info::TypeInfo for $ty {
+                    type Identity = Self;
+                    fn type_info() -> scale_info::Type {
+                        scale_info::Type {
+                            path: Path::new("NestedType", "my::module"),
+                            type_params: vec![TypeParameter::new(
+                                "T",
+                                Some(meta_type::<$generic>()),
+                            )],
+                            type_def: TypeDef::Composite(TypeDefComposite::new([Field::new(
+                                None,
+                                meta_type::<$inner>(),
+                                None,
+                                Vec::new(),
+                            )])),
+                            docs: vec![],
+                        }
+                    }
+                }
+            };
+        }
+
+        // A and B are the same because generics explain the param difference.
+        //
+        //NestedType<T = u32>(u32)
+        //NestedType<T = bool>(bool)
+        nested_type!(A, u32, u32);
+        nested_type!(B, bool, bool);
+
+        // As above, but another layer of nesting before generic param used.
+        //
+        //NestedType<T = u32>(Vec<u32>)
+        //NestedType<T = bool>(Vec<bool>)
+        nested_type!(C, bool, Vec<bool>);
+        nested_type!(D, u32, Vec<u32>);
+
+        // A third layer of nesting just to really check the recursion.
+        //
+        //NestedType<T = u32>(Vec<Foo<u32>>)
+        //NestedType<T = bool>(Vec<Foo<bool>>)
+        nested_type!(E, bool, Vec<Foo<bool>>);
+        nested_type!(F, u32, Vec<Foo<u32>>);
+
+        let mut registry = scale_info::Registry::new();
+        let id_a = registry.register_type(&meta_type::<A>()).id;
+        let id_b = registry.register_type(&meta_type::<B>()).id;
+        let id_c = registry.register_type(&meta_type::<C>()).id;
+        let id_d = registry.register_type(&meta_type::<D>()).id;
+        let id_e = registry.register_type(&meta_type::<E>()).id;
+        let id_f = registry.register_type(&meta_type::<F>()).id;
+        let mut registry = PortableRegistry::from(registry);
+
+        // Despite how many layers of nesting, we identify that the generic
+        // param can explain the difference, so can see them as being equal.
+        assert!(types_equal(id_a, id_b, &registry));
+        assert!(types_equal(id_c, id_d, &registry));
+        assert!(types_equal(id_e, id_f, &registry));
+
+        // Sanity check that the pairs are not equal with each other.
+        assert!(!types_equal(id_a, id_c, &registry));
+        assert!(!types_equal(id_a, id_e, &registry));
+        assert!(!types_equal(id_c, id_e, &registry));
+
+        // Now, check that the generated output is sane and in line with this...
+
+        ensure_unique_type_paths(&mut registry);
+        let settings = crate::TypeGeneratorSettings::new();
+        let output = crate::TypeGenerator::new(&registry, &settings)
+            .generate_types_mod()
+            .unwrap()
+            .to_token_stream(&settings);
+
+        // This isn't ideal, but I printed out the token stream, and it looks good (ie generates
+        // 3 types after deduplicating with the correct generic param usage), so this test will
+        // check that the output still looks good. To update, copy and `rustfmt` the new output
+        // and then adjust the odd thing until it matches again.
+        let expected = quote! {
+            pub mod types {
+                use super::types;
+                pub mod my {
+                    use super::types;
+                    pub mod module {
+                        use super::types;
+                        pub struct NestedType1<_0>(pub _0,);
+                        pub struct NestedType2<_0>(pub ::std::vec::Vec<_0>,);
+                        pub struct NestedType3<_0>(
+                            pub ::std::vec::Vec<types::scale_typegen::utils::tests::Foo<_0> >,
+                        );
+                    }
+                }
+                pub mod scale_typegen {
+                    use super::types;
+                    pub mod utils {
+                        use super::types;
+                        pub mod tests {
+                            use super::types;
+                            pub struct Foo<_0> {
+                                pub _inner: _0,
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        assert_eq!(output.to_string(), expected.to_string());
     }
 }
