@@ -1,3 +1,9 @@
+# [0.8.0] - 2024-05-24
+
+This release doesn't change the public API, but does effect the generated code to make it more correct and de-duplicate types better, but also a little less forgiving in certain edge cases. As such, I've decided to do a minor bump so that opting in to this change is explicit.
+
+- Improve type equality checking used during de-duplication of types to deduplicate more reliably/often ([#30](https://github.com/paritytech/scale-typegen/pull/30))
+
 # [0.7.0] - 2024-05-15
 
 - Bump `scale-value` to 0.16.0, in order to have only one `scale-decode` in the hierarchy.
