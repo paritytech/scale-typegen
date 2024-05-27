@@ -184,29 +184,22 @@ fn types_equal_inner(
         };
 
         match (&a.type_name, &b.type_name) {
-            (Some(a_type_name), Some(b_type_name))
-                if (a_ty_id_index.is_none() && b_ty_id_index.is_none()) =>
-            {
-                if a_type_name.contains("Self") && b_type_name.contains("Self") {
-                    types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params)
-                } else {
-                    false
-                }
+            (Some(_), Some(_)) if (a_ty_id_index.is_none() && b_ty_id_index.is_none()) => {
+                types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params)
             }
             (Some(a_type_name), Some(b_type_name)) => {
                 let type_names_present = match (
-                    a_params.index_for_type_name(&a_type_name),
-                    b_params.index_for_type_name(&b_type_name),
+                    a_params.index_for_type_name(a_type_name),
+                    b_params.index_for_type_name(b_type_name),
                 ) {
                     (Some(x), Some(z)) => x == z,
+                    (None, None) => a_type_name == b_type_name,
                     _ => false,
                 };
-                !a_type_name.contains("::") && type_names_present
+
+                !is_assoc(a) && !is_assoc(b) && type_names_present
             }
-            (None, None) if (a_ty_id_index == b_ty_id_index || is_assoc(a) && is_assoc(b)) => {
-                types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params)
-            }
-            (None, None) => false,
+            (None, None) => types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params),
             _ => false,
         }
     };
@@ -358,7 +351,7 @@ mod generics_list {
                 .iter()
                 .enumerate()
                 .map(|(idx, p)| {
-                    let type_id = p.ty.map_or(None, |ty| Some(ty.id));
+                    let type_id = p.ty.map(|ty| ty.id);
                     (type_id, idx, p.name.clone())
                 })
                 .collect();
@@ -477,7 +470,7 @@ mod tests {
                             type_def: TypeDef::Composite(TypeDefComposite::new([Field::new(
                                 None,
                                 meta_type::<$inner>(),
-                                None,
+                                Some("T"),
                                 Vec::new(),
                             )])),
                             docs: vec![],
@@ -595,8 +588,11 @@ mod tests {
 
         nested_type!(Y, A, A);
         nested_type!(W, B, B);
+        nested_type!(Z, C, C);
+
         let id_y = registry.register_type(&meta_type::<Y>()).id;
         let id_w = registry.register_type(&meta_type::<W>()).id;
+        let id_z = registry.register_type(&meta_type::<Z>()).id;
 
         let mut registry = PortableRegistry::from(registry);
 
@@ -609,7 +605,8 @@ mod tests {
         // D == E, different generic param names
         assert!(types_equal(id_d, id_e, &registry));
 
-        assert!(!types_equal(id_w, id_y, &registry));
+        assert!(types_equal(id_w, id_y, &registry));
+        assert!(types_equal(id_z, id_y, &registry));
 
         ensure_unique_type_paths(&mut registry);
         let settings = crate::TypeGeneratorSettings::new();
@@ -628,8 +625,7 @@ mod tests {
                         pub struct Foo<_0>(pub _0, );
                         pub struct NestedType1<_0, _1, _2>(pub _2, pub _1, pub _0, );
                         pub struct NestedType2<_0, _1, _2>(pub _0, pub _1, pub _2, );
-                        pub struct ParamType1 < _0 > (pub _0 ,) ;
-                        pub struct ParamType2 < _0 > (pub _0 ,) ;
+                        pub struct ParamType < _0 > (pub _0 ,) ;
                     }
                 }
             }
@@ -655,14 +651,51 @@ mod tests {
             inner: Vec<Self>,
         }
 
+        #[derive(TypeInfo)]
+        #[allow(dead_code)]
+        pub struct Foo<T> {
+            inner: Vec<T>,
+        }
+
+        #[derive(TypeInfo)]
+        #[allow(dead_code)]
+        pub enum FooEnum<T> {
+            None,
+            Go(Vec<T>),
+        }
+
         let mut registry = scale_info::Registry::new();
         let id_a = registry.register_type(&meta_type::<Test<u8>>()).id;
         let id_b = registry.register_type(&meta_type::<Test<u32>>()).id;
 
+        // Only generates code for id_foo, if we comment out code for id_foo it will generate bogus code
+        let id_foo = registry.register_type(&meta_type::<Foo<u32>>()).id;
+        // ie
+        // pub struct Foo<_0> {
+        //     pub inner: ::std::boxed::Box<
+        //         types::scale_typegen::utils::tests::Foo<
+        //             types::scale_typegen::utils::tests::TestStruct<::core::primitive::u32>,
+        //         >,
+        //     >,
+        //     pub __ignore: ::core::marker::PhantomData<_0>,
+        // }
+        // is this if because Box is not supported? works fine with Vec
+
+        let id_foo_foo = registry
+            .register_type(&meta_type::<Foo<Foo<TestStruct<u32>>>>())
+            .id;
+
+        let id_foo_enum = registry.register_type(&meta_type::<FooEnum<u32>>()).id;
+        let id_foo_foo_enum = registry
+            .register_type(&meta_type::<FooEnum<FooEnum<TestStruct<u32>>>>())
+            .id;
         let id_a_struct = registry.register_type(&meta_type::<TestStruct<u32>>()).id;
         let id_b_struct = registry.register_type(&meta_type::<TestStruct<u32>>()).id;
 
         let registry = PortableRegistry::from(registry);
+
+        assert!(types_equal(id_foo, id_foo_foo, &registry));
+        assert!(types_equal(id_foo_enum, id_foo_foo_enum, &registry));
 
         assert!(types_equal(id_a, id_b, &registry));
         assert!(types_equal(id_a_struct, id_b_struct, &registry));
@@ -672,7 +705,7 @@ mod tests {
             .generate_types_mod()
             .unwrap()
             .to_token_stream(&settings);
-
+        // Why codegen for Foo expands this way?
         let expected = quote! {
             pub mod types {
                 use super::types;
@@ -682,6 +715,13 @@ mod tests {
                         use super::types;
                         pub mod tests {
                             use super::types;
+                            pub struct Foo < _0 > {
+                                pub inner : :: std :: vec :: Vec < _0 > ,
+                            }
+                            pub enum FooEnum < _0 > {
+                                None ,
+                                Go (:: std :: vec :: Vec < _0 > ,) ,
+                            }
                             pub enum Test<_0> {
                                 None,
                                 Many {
