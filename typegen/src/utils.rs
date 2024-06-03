@@ -146,24 +146,17 @@ fn types_equal_inner(
         let b_params = b_parent_params.extend(&b_ty.type_params);
         (a_params, b_params)
     };
-    let both_composite = matches!(
-        (&a_ty.type_def, &b_ty.type_def),
-        (
-            TypeDef::Composite(_) | TypeDef::Variant(_) | TypeDef::Tuple(_),
-            TypeDef::Composite(_) | TypeDef::Variant(_) | TypeDef::Tuple(_)
-        )
-    );
     // If both IDs map to same generic param, then we'll assume equal. If they don't
     // then we need to keep checking other properties (eg Vec<bool> and Vec<u8> will have
     // different type IDs but may be the same type if the bool+u8 line up to generic params).
     if let (Some(a_idx), Some(b_idx)) = (a_generic_idx, b_generic_idx) {
-        if a_idx == b_idx && !both_composite {
+        if a_idx == b_idx {
             return true;
         }
     }
 
     // Paths differ; types won't be equal then!
-    if a_ty.path.segments != b_ty.path.segments && !both_composite {
+    if a_ty.path.segments != b_ty.path.segments {
         return false;
     }
 
@@ -177,14 +170,19 @@ fn types_equal_inner(
         }
 
         let equal_name = a.name == b.name;
-        let a_ty_id_index = a_params.index_for_type_id(a.ty.id);
-        let b_ty_id_index = b_params.index_for_type_id(b.ty.id);
+        let ty_indexes_deleted = a_params
+            .index_for_type_id(a.ty.id)
+            .zip(b_params.index_for_type_id(b.ty.id))
+            .is_none();
+
         if !equal_name {
             return false;
         };
 
         match (&a.type_name, &b.type_name) {
-            (Some(_), Some(_)) if (a_ty_id_index.is_none() && b_ty_id_index.is_none()) => {
+            // both generic but params were skipped
+            // removing this breaks utils::tests::recursive_data
+            (Some(_), Some(_)) if ty_indexes_deleted => {
                 types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params)
             }
             (Some(a_type_name), Some(b_type_name)) => {
@@ -192,7 +190,9 @@ fn types_equal_inner(
                     a_params.index_for_type_name(a_type_name),
                     b_params.index_for_type_name(b_type_name),
                 ) {
+                    // generic param idxs are the same
                     (Some(x), Some(z)) => x == z,
+                    // no indexed present so we compare just the type names
                     (None, None) => a_type_name == b_type_name,
                     _ => false,
                 };
@@ -521,6 +521,26 @@ mod tests {
                 }
             }
         }
+        struct BB;
+        impl scale_info::TypeInfo for BB {
+            type Identity = Self;
+            fn type_info() -> scale_info::Type {
+                scale_info::Type {
+                    path: Path::new("NestedType", "my::module"),
+                    type_params: vec![
+                        TypeParameter::new("V", Some(meta_type::<u8>())),
+                        TypeParameter::new("U", Some(meta_type::<u16>())),
+                        TypeParameter::new("T", Some(meta_type::<u32>())),
+                    ],
+                    type_def: TypeDef::Composite(TypeDefComposite::new([
+                        Field::new(None, meta_type::<u32>(), Some("T"), Vec::new()),
+                        Field::new(None, meta_type::<u16>(), Some("U"), Vec::new()),
+                        Field::new(None, meta_type::<u8>(), Some("V"), Vec::new()),
+                    ])),
+                    docs: vec![],
+                }
+            }
+        }
 
         struct C;
         impl scale_info::TypeInfo for C {
@@ -580,6 +600,7 @@ mod tests {
 
         let mut registry = scale_info::Registry::new();
         let id_b = registry.register_type(&meta_type::<B>()).id;
+        let id_bb = registry.register_type(&meta_type::<BB>()).id;
         let id_a = registry.register_type(&meta_type::<A>()).id;
         let id_c = registry.register_type(&meta_type::<C>()).id;
 
@@ -598,6 +619,7 @@ mod tests {
 
         // A != B, different field ordering
         assert!(!types_equal(id_a, id_b, &registry));
+        assert!(!types_equal(id_a, id_bb, &registry));
 
         // A == C, different generic param names
         assert!(types_equal(id_a, id_c, &registry));
@@ -668,18 +690,7 @@ mod tests {
         let id_a = registry.register_type(&meta_type::<Test<u8>>()).id;
         let id_b = registry.register_type(&meta_type::<Test<u32>>()).id;
 
-        // Only generates code for id_foo, if we comment out code for id_foo it will generate bogus code
         let id_foo = registry.register_type(&meta_type::<Foo<u32>>()).id;
-        // ie
-        // pub struct Foo<_0> {
-        //     pub inner: ::std::boxed::Box<
-        //         types::scale_typegen::utils::tests::Foo<
-        //             types::scale_typegen::utils::tests::TestStruct<::core::primitive::u32>,
-        //         >,
-        //     >,
-        //     pub __ignore: ::core::marker::PhantomData<_0>,
-        // }
-        // is this if because Box is not supported? works fine with Vec
 
         let id_foo_foo = registry
             .register_type(&meta_type::<Foo<Foo<TestStruct<u32>>>>())
@@ -690,7 +701,9 @@ mod tests {
             .register_type(&meta_type::<FooEnum<FooEnum<TestStruct<u32>>>>())
             .id;
         let id_a_struct = registry.register_type(&meta_type::<TestStruct<u32>>()).id;
-        let id_b_struct = registry.register_type(&meta_type::<TestStruct<u32>>()).id;
+        let id_b_struct = registry
+            .register_type(&meta_type::<TestStruct<TestStruct<u64>>>())
+            .id;
 
         let registry = PortableRegistry::from(registry);
 
