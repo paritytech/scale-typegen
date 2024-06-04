@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::typegen::settings::substitutes::TryIntoSynPath;
 use crate::TypeGeneratorSettings;
 
 use super::type_ir::TypeIR;
@@ -32,8 +33,28 @@ impl ToTokensWithSettings for ModuleIR {
             .map(|ir| ir.to_token_stream(settings));
         let types = self
             .types
-            .values()
-            .map(|(_, ir)| ir.to_token_stream(settings))
+            .iter()
+            .map(|(path, (_, ir))| {
+                let parent_path = path.syn_path().map(|mut path| {
+                    // add the root module to the parent_path
+                    let extension = syn::PathSegment {
+                        ident: settings.types_mod_ident.clone(),
+                        arguments: syn::PathArguments::None,
+                    };
+                    let punctuated = {
+                        let mut buf = syn::punctuated::Punctuated::new();
+                        buf.push_value(extension);
+                        buf.push_punct(syn::token::PathSep::default());
+                        buf.extend(path.segments);
+                        buf
+                    };
+                    path.segments = punctuated;
+                    path
+                });
+                let res =
+                    settings.with_parent_path(parent_path, |settings| ir.to_token_stream(settings));
+                res
+            })
             .clone();
 
         tokens.extend(quote! {

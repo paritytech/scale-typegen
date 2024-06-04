@@ -294,7 +294,7 @@ impl CompositeIR {
 
 impl ToTokensWithSettings for CompositeFieldIR {
     fn to_tokens(&self, tokens: &mut TokenStream, settings: &TypeGeneratorSettings) {
-        let ty_path = &self.type_path.to_syn_type(&settings.alloc_crate_path);
+        let ty_path = &self.type_path.to_syn_type(&settings);
         if self.is_boxed {
             let alloc_path = &settings.alloc_crate_path;
             tokens.extend(quote! { #alloc_path::boxed::Box<#ty_path> })

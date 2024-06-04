@@ -30,7 +30,7 @@ pub enum TypePathInner {
 
 impl ToTokensWithSettings for TypePath {
     fn to_tokens(&self, tokens: &mut TokenStream, settings: &TypeGeneratorSettings) {
-        let syn_type = self.to_syn_type(&settings.alloc_crate_path);
+        let syn_type = self.to_syn_type(&settings);
         syn_type.to_tokens(tokens)
     }
 }
@@ -56,10 +56,10 @@ impl TypePath {
         }))
     }
 
-    pub(crate) fn to_syn_type(&self, alloc_crate_path: &AllocCratePath) -> syn::Type {
+    pub(crate) fn to_syn_type(&self, settings: &TypeGeneratorSettings) -> syn::Type {
         match &self.0 {
             TypePathInner::Parameter(ty_param) => syn::Type::Path(parse_quote! { #ty_param }),
-            TypePathInner::Type(ty) => ty.to_syn_type(alloc_crate_path),
+            TypePathInner::Type(ty) => ty.to_syn_type(settings),
         }
     }
 
@@ -283,29 +283,53 @@ impl TypePathType {
         )
     }
 
-    fn to_syn_type(&self, alloc_crate_path: &AllocCratePath) -> syn::Type {
+    fn to_syn_type(&self, settings: &TypeGeneratorSettings) -> syn::Type {
+        let alloc_crate_path = &settings.alloc_crate_path;
         match &self {
             TypePathType::Path { path, params } => {
                 let path = if params.is_empty() {
                     parse_quote! { #path }
                 } else {
-                    let params = params.iter().map(|e| e.to_syn_type(alloc_crate_path));
+                    let params = params.iter().map(|e| e.to_syn_type(settings));
+                    let parent_path = settings
+                        .parent_path
+                        .borrow()
+                        .as_ref()
+                        .filter(|x| path == *x)
+                        .map(|x| {
+                            use syn::Path;
+                            let Path {
+                                segments,
+                                leading_colon,
+                            } = x;
+                            let segments = {
+                                let mut punctuated = syn::punctuated::Punctuated::new();
+                                let self_ident = segments.last().expect("this should not happen");
+                                punctuated.push_value(self_ident.clone());
+                                punctuated
+                            };
+                            Path {
+                                segments,
+                                leading_colon: *leading_colon,
+                            }
+                        });
+                    let path = parent_path.as_ref().unwrap_or(path);
                     parse_quote! { #path< #( #params ),* > }
                 };
                 syn::Type::Path(path)
             }
             TypePathType::Vec { of } => {
-                let of = of.to_syn_type(alloc_crate_path);
+                let of = of.to_syn_type(settings);
                 let type_path = parse_quote! { #alloc_crate_path::vec::Vec<#of> };
                 syn::Type::Path(type_path)
             }
             TypePathType::Array { len, of } => {
-                let of = of.to_syn_type(alloc_crate_path);
+                let of = of.to_syn_type(settings);
                 let array = parse_quote! { [#of; #len] };
                 syn::Type::Array(array)
             }
             TypePathType::Tuple { elements } => {
-                let elements = elements.iter().map(|e| e.to_syn_type(alloc_crate_path));
+                let elements = elements.iter().map(|e| e.to_syn_type(settings));
                 let tuple = parse_quote! { (#( # elements, )* ) };
                 syn::Type::Tuple(tuple)
             }
@@ -331,7 +355,7 @@ impl TypePathType {
                 is_field,
                 compact_type_path,
             } => {
-                let inner = inner.to_syn_type(alloc_crate_path);
+                let inner = inner.to_syn_type(settings);
                 let path = if *is_field {
                     // compact fields can use the inner compact type directly and be annotated with
                     // the `compact` attribute e.g. `#[codec(compact)] my_compact_field: u128`
@@ -346,8 +370,8 @@ impl TypePathType {
                 bit_store_type,
                 decoded_bits_type_path,
             } => {
-                let bit_order_type = bit_order_type.to_syn_type(alloc_crate_path);
-                let bit_store_type = bit_store_type.to_syn_type(alloc_crate_path);
+                let bit_order_type = bit_order_type.to_syn_type(settings);
+                let bit_store_type = bit_store_type.to_syn_type(settings);
                 let type_path =
                     parse_quote! { #decoded_bits_type_path<#bit_store_type, #bit_order_type> };
                 syn::Type::Path(type_path)

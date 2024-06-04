@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use derives::DerivesRegistry;
 use proc_macro2::Ident;
 use quote::{quote, ToTokens};
@@ -41,6 +43,8 @@ pub struct TypeGeneratorSettings {
     /// `alloc::string::String`, `alloc::vec::Vec` and `alloc::boxed::Box`. The default is `AllocCratePath::Std` which
     /// uses the types from the `std` library instead.
     pub alloc_crate_path: AllocCratePath,
+    /// path of the parent type
+    pub parent_path: RefCell<Option<syn::Path>>,
 }
 
 /// Information about how to construct the type paths for types that need allocation, e.g.
@@ -78,6 +82,7 @@ impl Default for TypeGeneratorSettings {
             compact_type_path: None,
             insert_codec_attributes: false,
             alloc_crate_path: Default::default(),
+            parent_path: RefCell::default(),
         }
     }
 }
@@ -86,6 +91,17 @@ impl TypeGeneratorSettings {
     /// Creates a new `TypeGeneratorSettings`.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Run function with modified parent_path
+    pub fn with_parent_path<T>(&self, path: Option<syn::Path>, f: T) -> proc_macro2::TokenStream
+    where
+        T: FnOnce(&Self) -> proc_macro2::TokenStream,
+    {
+        let old_path = self.parent_path.replace(path);
+        let result = f(&self);
+        self.parent_path.replace(old_path);
+        result
     }
 
     /// Sets the `type_mod_name` field.

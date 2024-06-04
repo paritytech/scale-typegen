@@ -1774,3 +1774,85 @@ fn alloc_crate_path_replacement() {
     assert_eq!(std_code.to_string(), expected_std_code.to_string());
     assert_eq!(no_std_code.to_string(), expected_no_std_code.to_string());
 }
+#[test]
+fn ensure_unique_names_recursion() {
+    use scale_info::PortableRegistry;
+
+    #[allow(unused)]
+    #[derive(TypeInfo)]
+    #[scale_info(skip_type_params(A))]
+    struct Example<A, B> {
+        id: A,
+        rest: B,
+        inner: Vec<Example<A, B>>,
+    }
+
+    let mut registry = Testgen::new()
+        .with::<Example<String, u32>>()
+        .with::<Example<u8, u32>>()
+        .with::<Example<u16, u32>>()
+        .into_portable_registry();
+
+    let sorted_type_paths = |registry: &PortableRegistry| -> Vec<String> {
+        let mut lines = registry
+            .types
+            .iter()
+            .map(|t| t.ty.path.segments.clone().join("::"))
+            .filter(|e| !e.is_empty())
+            .collect::<Vec<String>>();
+        lines.sort();
+        lines
+    };
+
+    let e1 = sorted_type_paths(&registry);
+    assert_eq!(
+        e1,
+        vec![
+            "scale_typegen::tests::Example",
+            "scale_typegen::tests::Example",
+            "scale_typegen::tests::Example",
+        ]
+    );
+
+    ensure_unique_type_paths(&mut registry);
+
+    let e2 = sorted_type_paths(&registry);
+    assert_eq!(
+        e2,
+        vec![
+            "scale_typegen::tests::Example1",
+            "scale_typegen::tests::Example2",
+            "scale_typegen::tests::Example3",
+        ]
+    );
+
+    let generated = Testgen::new()
+        .with::<Example<String, u32>>()
+        .with::<Example<u8, u32>>()
+        .with::<Example<u16, u32>>()
+        .try_gen_tests_mod(Default::default(), true)
+        .unwrap();
+
+    let expected = quote! {
+        pub mod tests {
+            use super::types;
+            pub struct Example1<_1> {
+                pub id: ::std::string::String,
+                pub rest: _1,
+                pub inner: ::std::vec::Vec<Example1<_1> >,
+            }
+            pub struct Example2<_1> {
+                pub id: ::core::primitive::u8,
+                pub rest: _1,
+                pub inner: ::std::vec::Vec<Example2<_1> >,
+            }
+            pub struct Example3<_1> {
+                pub id: ::core::primitive::u16,
+                pub rest: _1,
+                pub inner: ::std::vec::Vec<Example3<_1> >,
+            }
+        }
+    };
+
+    assert_eq!(expected.to_string(), generated.to_string())
+}
