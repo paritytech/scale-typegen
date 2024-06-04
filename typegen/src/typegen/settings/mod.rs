@@ -99,7 +99,7 @@ impl TypeGeneratorSettings {
         T: FnOnce(&Self) -> proc_macro2::TokenStream,
     {
         let old_path = self.parent_path.replace(path);
-        let result = f(&self);
+        let result = f(self);
         self.parent_path.replace(old_path);
         result
     }

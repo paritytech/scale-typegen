@@ -30,7 +30,7 @@ pub enum TypePathInner {
 
 impl ToTokensWithSettings for TypePath {
     fn to_tokens(&self, tokens: &mut TokenStream, settings: &TypeGeneratorSettings) {
-        let syn_type = self.to_syn_type(&settings);
+        let syn_type = self.to_syn_type(settings);
         syn_type.to_tokens(tokens)
     }
 }

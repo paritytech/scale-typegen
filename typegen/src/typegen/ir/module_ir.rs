@@ -51,9 +51,7 @@ impl ToTokensWithSettings for ModuleIR {
                     path.segments = punctuated;
                     path
                 });
-                let res =
-                    settings.with_parent_path(parent_path, |settings| ir.to_token_stream(settings));
-                res
+                settings.with_parent_path(parent_path, |settings| ir.to_token_stream(settings))
             })
             .clone();
 
