@@ -146,6 +146,7 @@ fn types_equal_inner(
         let b_params = b_parent_params.extend(&b_ty.type_params);
         (a_params, b_params)
     };
+
     // If both IDs map to same generic param, then we'll assume equal. If they don't
     // then we need to keep checking other properties (eg Vec<bool> and Vec<u8> will have
     // different type IDs but may be the same type if the bool+u8 line up to generic params).
