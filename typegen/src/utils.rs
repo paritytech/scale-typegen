@@ -161,51 +161,38 @@ fn types_equal_inner(
         return false;
     }
 
-    let mut compare_fields = |a_params: &GenericsList,
-                              b_params: &GenericsList,
-                              a: &Field<PortableForm>,
-                              b: &Field<PortableForm>|
+    #[rustfmt::skip]
+    let mut compare_fields = |
+        a: &Field<PortableForm>,
+        a_params: &GenericsList,
+        b: &Field<PortableForm>,
+        b_params: &GenericsList|
      -> bool {
-        fn is_assoc(param: &Field<PortableForm>) -> bool {
-            param.type_name.as_ref().is_some_and(|x| x.contains("::"))
-        }
-
         if a.name != b.name {
             return false;
         }
 
-        let ty_indexes_deleted = a_params
+        // Vec<T>, Option<T>, etc and #[scale_info(skip_type_params(T))]
+        let ty_is_skipped_or_wrapped = a_params
             .index_for_type_id(a.ty.id)
             .zip(b_params.index_for_type_id(b.ty.id))
             .is_none();
 
-        if !equal_name {
-            return false;
-        };
-
-        match (&a.type_name, &b.type_name) {
-            // both generic but params were skipped
-            // removing this breaks utils::tests::recursive_data
-            (Some(_), Some(_)) if ty_indexes_deleted => {
-                types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params)
-            }
-            (Some(a_type_name), Some(b_type_name)) => {
-                let type_names_present = match (
-                    a_params.index_for_type_name(a_type_name),
-                    b_params.index_for_type_name(b_type_name),
-                ) {
-                    // generic param idxs are the same
-                    (Some(x), Some(z)) => x == z,
-                    // no indexed present so we compare just the type names
-                    (None, None) => a_type_name == b_type_name,
-                    _ => false,
-                };
-
-                !is_assoc(a) && !is_assoc(b) && type_names_present
-            }
-            (None, None) => types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params),
-            _ => false,
-        }
+        // Check that both type names are present or recurse in case of wrapped types
+        a.type_name
+            .as_ref()
+            .zip(b.type_name.as_ref())
+            .filter(|(_, _)| !ty_is_skipped_or_wrapped)
+            .map_or_else(
+                || types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params),
+                |(a_type_name, b_type_name)| {
+                    // check that both type names are present in Generic Params and have the same indexes
+                    a_params
+                        .index_for_type_name(a_type_name.as_ref())
+                        .zip(b_params.index_for_type_name(b_type_name))
+                        .is_some_and(|(a, b)| a == b)
+                },
+            )
     };
 
     // Check that all of the fields of some type are equal.
@@ -220,7 +207,7 @@ fn types_equal_inner(
             return false;
         }
         a.iter().zip(b.iter()).all(|(a, b)| {
-           compare_fields(a_params, b_params, a, b)
+           compare_fields(a, a_params, b, b_params)
         })
     };
 
@@ -298,7 +285,7 @@ mod generics_list {
     struct GenericsListInner {
         previous: Option<GenericsList>,
         start_idx: usize,
-        generics_by_id: Vec<(Option<u32>, usize, String)>,
+        generics_by_id: Vec<(u32, String)>,
     }
 
     impl GenericsList {
@@ -308,8 +295,8 @@ mod generics_list {
                 .inner
                 .generics_by_id
                 .iter()
-                .find(|(id, _, _)| id.is_some_and(|id| id == type_id))
-                .map(|(_, index, _)| self.inner.start_idx + index);
+                .position(|(id, _)| *id == type_id)
+                .map(|index| self.inner.start_idx + index);
 
             // if index isn't found here, go back to the previous list and try again.
             maybe_index.or_else(|| {
@@ -325,8 +312,8 @@ mod generics_list {
                 .inner
                 .generics_by_id
                 .iter()
-                .find(|(_, _, type_name)| *type_name == name)
-                .map(|(_, index, _)| self.inner.start_idx + index);
+                .position(|(_, type_name)| *type_name == name)
+                .map(|index| self.inner.start_idx + index);
 
             // if index isn't found here, go back to the previous list and try again.
             maybe_index.or_else(|| {
@@ -353,11 +340,7 @@ mod generics_list {
         ) -> Self {
             let generics_by_id = params
                 .iter()
-                .enumerate()
-                .map(|(idx, p)| {
-                    let type_id = p.ty.map(|ty| ty.id);
-                    (type_id, idx, p.name.clone())
-                })
+                .filter_map(|p| p.ty.map(|ty| (ty.id, p.name.clone())))
                 .collect();
 
             let start_idx = match &maybe_self {
@@ -389,7 +372,7 @@ mod tests {
     };
 
     #[test]
-    fn assoc_generics() {
+    fn associated_types_are_properly_deduplicated() {
         trait X {
             type Assoc;
         }
