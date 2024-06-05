@@ -170,7 +170,10 @@ fn types_equal_inner(
             param.type_name.as_ref().is_some_and(|x| x.contains("::"))
         }
 
-        let equal_name = a.name == b.name;
+        if a.name != b.name {
+            return false;
+        }
+
         let ty_indexes_deleted = a_params
             .index_for_type_id(a.ty.id)
             .zip(b_params.index_for_type_id(b.ty.id))
