@@ -166,13 +166,13 @@ fn types_equal_inner(
         a: &Field<PortableForm>,
         a_params: &GenericsList,
         b: &Field<PortableForm>,
-        b_params: &GenericsList|
-     -> bool {
+        b_params: &GenericsList
+    | -> bool {
         if a.name != b.name {
             return false;
         }
 
-        // The type is wrapped in another type such as `Vec<T>` or 
+        // The type is wrapped in another type such as `Vec<T>` or
         // marked as skipped with `#[scale_info(skip_type_params(T))]`
         let ty_is_skipped_or_wrapped = a_params
             .index_for_type_id(a.ty.id)
@@ -180,20 +180,16 @@ fn types_equal_inner(
             .is_none();
 
         // Check that both type names are present or recurse in case of wrapped types
-        a.type_name
-            .as_ref()
-            .zip(b.type_name.as_ref())
-            .filter(|(_, _)| !ty_is_skipped_or_wrapped)
-            .map_or_else(
-                || types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params),
-                |(a_type_name, b_type_name)| {
-                    // check that both type names are present in Generic Params and have the same indexes
-                    a_params
-                        .index_for_type_name(a_type_name.as_ref())
-                        .zip(b_params.index_for_type_name(b_type_name))
-                        .is_some_and(|(a, b)| a == b)
-                },
-            )
+        match (&a.type_name, &b.type_name) {
+            (Some(a_type_name), Some(b_type_name)) if !ty_is_skipped_or_wrapped => {
+                // check that both type names are present in Generic Params and have the same indexes
+                a_params
+                    .index_for_type_name(a_type_name)
+                    .zip(b_params.index_for_type_name(b_type_name))
+                    .is_some_and(|(a, b)| a == b)
+            }
+            _ => types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params),
+        }
     };
 
     // Check that all of the fields of some type are equal.
@@ -812,7 +808,7 @@ mod tests {
         }
 
         macro_rules! nested_type {
-            ($ty:ident, $generic:ty, $inner:ty) => {
+            ($ty:ident, $generic:ty, $inner:ty, $param_name:literal) => {
                 struct $ty;
                 impl scale_info::TypeInfo for $ty {
                     type Identity = Self;
@@ -820,31 +816,7 @@ mod tests {
                         scale_info::Type {
                             path: Path::new("NestedType", "my::module"),
                             type_params: vec![TypeParameter::new(
-                                "T",
-                                Some(meta_type::<$generic>()),
-                            )],
-                            type_def: TypeDef::Composite(TypeDefComposite::new([Field::new(
-                                None,
-                                meta_type::<$inner>(),
-                                None,
-                                Vec::new(),
-                            )])),
-                            docs: vec![],
-                        }
-                    }
-                }
-            };
-        }
-        macro_rules! nested_typeB {
-            ($ty:ident, $generic:ty, $inner:ty) => {
-                struct $ty;
-                impl scale_info::TypeInfo for $ty {
-                    type Identity = Self;
-                    fn type_info() -> scale_info::Type {
-                        scale_info::Type {
-                            path: Path::new("NestedType", "my::module"),
-                            type_params: vec![TypeParameter::new(
-                                "B",
+                                $param_name,
                                 Some(meta_type::<$generic>()),
                             )],
                             type_def: TypeDef::Composite(TypeDefComposite::new([Field::new(
@@ -864,23 +836,23 @@ mod tests {
         //
         //NestedType<T = u32>(u32)
         //NestedType<T = bool>(bool)
-        nested_type!(A, u32, u32);
-        nested_type!(B, bool, bool);
-        nested_typeB!(G, u64, u64);
+        nested_type!(A, u32, u32, "T");
+        nested_type!(B, bool, bool, "T");
+        nested_type!(G, u64, u64, "B");
 
         // As above, but another layer of nesting before generic param used.
         //
         //NestedType<T = u32>(Vec<u32>)
         //NestedType<T = bool>(Vec<bool>)
-        nested_type!(C, bool, Vec<bool>);
-        nested_type!(D, u32, Vec<u32>);
+        nested_type!(C, bool, Vec<bool>, "T");
+        nested_type!(D, u32, Vec<u32>, "T");
 
         // A third layer of nesting just to really check the recursion.
         //
         //NestedType<T = u32>(Vec<Foo<u32>>)
         //NestedType<T = bool>(Vec<Foo<bool>>)
-        nested_type!(E, bool, Vec<Foo<bool>>);
-        nested_type!(F, u32, Vec<Foo<u32>>);
+        nested_type!(E, bool, Vec<Foo<bool>>, "T");
+        nested_type!(F, u32, Vec<Foo<u32>>, "T");
 
         let mut registry = scale_info::Registry::new();
         let id_a = registry.register_type(&meta_type::<A>()).id;
