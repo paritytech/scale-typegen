@@ -307,7 +307,7 @@ mod generics_list {
                     .and_then(|prev| prev.index_for_type_id(type_id))
             })
         }
-        /// Return the unique index of a generic in the list, or None if not found
+        /// Returns the unique index of a generic type name, or None if not found.
         pub fn index_for_type_name(&self, name: &str) -> Option<usize> {
             let maybe_index = self
                 .inner
