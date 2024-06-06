@@ -172,7 +172,8 @@ fn types_equal_inner(
             return false;
         }
 
-        // Vec<T>, Option<T>, etc and #[scale_info(skip_type_params(T))]
+        // The type is wrapped in another type such as `Vec<T>` or 
+        // marked as skipped with `#[scale_info(skip_type_params(T))]`
         let ty_is_skipped_or_wrapped = a_params
             .index_for_type_id(a.ty.id)
             .zip(b_params.index_for_type_id(b.ty.id))
