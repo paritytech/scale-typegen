@@ -131,6 +131,22 @@ fn types_equal_inner(
     let a_generic_idx = a_parent_params.index_for_type_id(a);
     let b_generic_idx = b_parent_params.index_for_type_id(b);
 
+    let a_ty = types.resolve(a).expect("type a should exist in registry");
+    let b_ty = types.resolve(b).expect("type b should exist in registry");
+
+    // Capture a few variables to avoid some repetition later when we recurse.
+    let mut types_equal_recurse =
+        |a: u32, a_params: &GenericsList, b: u32, b_params: &GenericsList| -> bool {
+            types_equal_inner(a, a_params, a_visited, b, b_params, b_visited, types)
+        };
+
+    // We'll lazily extend our type params only if the shapes match.
+    let calc_params = || {
+        let a_params = a_parent_params.extend(&a_ty.type_params);
+        let b_params = b_parent_params.extend(&b_ty.type_params);
+        (a_params, b_params)
+    };
+
     // If both IDs map to same generic param, then we'll assume equal. If they don't
     // then we need to keep checking other properties (eg Vec<bool> and Vec<u8> will have
     // different type IDs but may be the same type if the bool+u8 line up to generic params).
@@ -140,36 +156,41 @@ fn types_equal_inner(
         }
     }
 
-    let a_ty = types.resolve(a).expect("type a should exist in registry");
-    let b_ty = types.resolve(b).expect("type b should exist in registry");
-
     // Paths differ; types won't be equal then!
     if a_ty.path.segments != b_ty.path.segments {
         return false;
     }
 
-    // Names of type params don't line up, so different then!
-    if a_ty
-        .type_params
-        .iter()
-        .zip(&b_ty.type_params)
-        .any(|(a, b)| a.name != b.name)
-    {
-        return false;
-    }
+    #[rustfmt::skip]
+    let mut compare_fields = |
+        a: &Field<PortableForm>,
+        a_params: &GenericsList,
+        b: &Field<PortableForm>,
+        b_params: &GenericsList
+    | -> bool {
+        if a.name != b.name {
+            return false;
+        }
 
-    // We'll lazily extend our type params only if the shapes match.
-    let calc_params = || {
-        let a_params = a_parent_params.extend(&a_ty.type_params);
-        let b_params = b_parent_params.extend(&b_ty.type_params);
-        (a_params, b_params)
+        // The type is wrapped in another type such as `Vec<T>` or
+        // marked as skipped with `#[scale_info(skip_type_params(T))]`
+        let ty_is_skipped_or_wrapped = a_params
+            .index_for_type_id(a.ty.id)
+            .zip(b_params.index_for_type_id(b.ty.id))
+            .is_none();
+
+        // Check that both type names are present or recurse in case of wrapped types
+        match (&a.type_name, &b.type_name) {
+            (Some(a_type_name), Some(b_type_name)) if !ty_is_skipped_or_wrapped => {
+                // check that both type names are present in Generic Params and have the same indexes
+                a_params
+                    .index_for_type_name(a_type_name)
+                    .zip(b_params.index_for_type_name(b_type_name))
+                    .is_some_and(|(a, b)| a == b)
+            }
+            _ => types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params),
+        }
     };
-
-    // Capture a few variables to avoid some repetition later when we recurse.
-    let mut types_equal_recurse =
-        |a: u32, a_params: &GenericsList, b: u32, b_params: &GenericsList| -> bool {
-            types_equal_inner(a, a_params, a_visited, b, b_params, b_visited, types)
-        };
 
     // Check that all of the fields of some type are equal.
     #[rustfmt::skip]
@@ -177,15 +198,13 @@ fn types_equal_inner(
         a: &[Field<PortableForm>],
         a_params: &GenericsList,
         b: &[Field<PortableForm>],
-        b_params: &GenericsList
+        b_params: &GenericsList,
     | -> bool {
         if a.len() != b.len() {
             return false;
         }
         a.iter().zip(b.iter()).all(|(a, b)| {
-            a.name == b.name
-                && a.type_name == b.type_name
-                && types_equal_recurse(a.ty.id, a_params, b.ty.id, b_params)
+           compare_fields(a, a_params, b, b_params)
         })
     };
 
@@ -263,7 +282,7 @@ mod generics_list {
     struct GenericsListInner {
         previous: Option<GenericsList>,
         start_idx: usize,
-        generics_by_id: Vec<u32>,
+        generics_by_id: Vec<(u32, String)>,
     }
 
     impl GenericsList {
@@ -273,9 +292,8 @@ mod generics_list {
                 .inner
                 .generics_by_id
                 .iter()
-                .enumerate()
-                .find(|(_, id)| **id == type_id)
-                .map(|(index, _)| self.inner.start_idx + index);
+                .position(|(id, _)| *id == type_id)
+                .map(|index| self.inner.start_idx + index);
 
             // if index isn't found here, go back to the previous list and try again.
             maybe_index.or_else(|| {
@@ -283,6 +301,23 @@ mod generics_list {
                     .previous
                     .as_ref()
                     .and_then(|prev| prev.index_for_type_id(type_id))
+            })
+        }
+        /// Returns the unique index of a generic type name, or None if not found.
+        pub fn index_for_type_name(&self, name: &str) -> Option<usize> {
+            let maybe_index = self
+                .inner
+                .generics_by_id
+                .iter()
+                .position(|(_, type_name)| *type_name == name)
+                .map(|index| self.inner.start_idx + index);
+
+            // if index isn't found here, go back to the previous list and try again.
+            maybe_index.or_else(|| {
+                self.inner
+                    .previous
+                    .as_ref()
+                    .and_then(|prev| prev.index_for_type_name(name))
             })
         }
 
@@ -300,7 +335,10 @@ mod generics_list {
             maybe_self: Option<GenericsList>,
             params: &[TypeParameter<PortableForm>],
         ) -> Self {
-            let generics_by_id = params.iter().filter_map(|p| p.ty.map(|ty| ty.id)).collect();
+            let generics_by_id = params
+                .iter()
+                .filter_map(|p| p.ty.map(|ty| (ty.id, p.name.clone())))
+                .collect();
 
             let start_idx = match &maybe_self {
                 Some(list) => list.inner.start_idx + list.inner.generics_by_id.len(),
@@ -330,6 +368,380 @@ mod tests {
         TypeParameter,
     };
 
+    #[test]
+    fn associated_types_are_properly_deduplicated() {
+        trait X {
+            type Assoc;
+        }
+        struct A;
+        impl X for A {
+            type Assoc = u8;
+        }
+        struct B;
+        impl X for B {
+            type Assoc = u32;
+        }
+
+        #[derive(TypeInfo)]
+        #[scale_info(skip_type_params(T))] // this is optional
+        struct Foo<T: X> {
+            _field: T::Assoc,
+        }
+
+        #[allow(unused)]
+        #[derive(TypeInfo)]
+        struct Bar {
+            p: Foo<A>,
+            q: Foo<B>,
+        }
+
+        let mut registry = scale_info::Registry::new();
+        let _ = registry.register_type(&scale_info::meta_type::<Bar>()).id;
+        let mut registry = scale_info::PortableRegistry::from(registry);
+
+        ensure_unique_type_paths(&mut registry);
+
+        let settings = crate::TypeGeneratorSettings::new();
+        let generated = crate::typegen::ir::ToTokensWithSettings::to_token_stream(
+            &crate::TypeGenerator::new(&registry, &settings)
+                .generate_types_mod()
+                .unwrap(),
+            &settings,
+        );
+
+        let expected = quote!(
+            pub mod types {
+                use super::types;
+                pub mod scale_typegen {
+                    use super::types;
+                    pub mod utils {
+                        use super::types;
+                        pub mod tests {
+                            use super::types;
+                            pub struct Bar {
+                                pub p: types::scale_typegen::utils::tests::Foo1,
+                                pub q: types::scale_typegen::utils::tests::Foo2,
+                            }
+                            pub struct Foo1 {
+                                pub _field: ::core::primitive::u8,
+                            }
+                            pub struct Foo2 {
+                                pub _field: ::core::primitive::u32,
+                            }
+                        }
+                    }
+                }
+            }
+        );
+
+        assert_eq!(expected.to_string(), generated.to_string());
+    }
+
+    #[test]
+    fn generics_unification() {
+        macro_rules! nested_type {
+            ($ty:ident, $generic:ty, $inner:ty) => {
+                struct $ty;
+                impl scale_info::TypeInfo for $ty {
+                    type Identity = Self;
+                    fn type_info() -> scale_info::Type {
+                        scale_info::Type {
+                            path: Path::new("ParamType", "my::module"),
+                            type_params: vec![TypeParameter::new(
+                                "T",
+                                Some(meta_type::<$generic>()),
+                            )],
+                            type_def: TypeDef::Composite(TypeDefComposite::new([Field::new(
+                                None,
+                                meta_type::<$inner>(),
+                                Some("T"),
+                                Vec::new(),
+                            )])),
+                            docs: vec![],
+                        }
+                    }
+                }
+            };
+        }
+
+        struct A;
+        impl scale_info::TypeInfo for A {
+            type Identity = Self;
+            fn type_info() -> scale_info::Type {
+                scale_info::Type {
+                    path: Path::new("NestedType", "my::module"),
+                    type_params: vec![
+                        TypeParameter::new("T", Some(meta_type::<u8>())),
+                        TypeParameter::new("U", Some(meta_type::<u16>())),
+                        TypeParameter::new("V", Some(meta_type::<u32>())),
+                    ],
+                    type_def: TypeDef::Composite(TypeDefComposite::new([
+                        Field::new(None, meta_type::<u8>(), Some("T"), Vec::new()),
+                        Field::new(None, meta_type::<u16>(), Some("U"), Vec::new()),
+                        Field::new(None, meta_type::<u32>(), Some("V"), Vec::new()),
+                    ])),
+                    docs: vec![],
+                }
+            }
+        }
+
+        struct B;
+        impl scale_info::TypeInfo for B {
+            type Identity = Self;
+            fn type_info() -> scale_info::Type {
+                scale_info::Type {
+                    path: Path::new("NestedType", "my::module"),
+                    type_params: vec![
+                        TypeParameter::new("T", Some(meta_type::<u8>())),
+                        TypeParameter::new("U", Some(meta_type::<u16>())),
+                        TypeParameter::new("V", Some(meta_type::<u32>())),
+                    ],
+                    type_def: TypeDef::Composite(TypeDefComposite::new([
+                        Field::new(None, meta_type::<u32>(), Some("V"), Vec::new()),
+                        Field::new(None, meta_type::<u16>(), Some("U"), Vec::new()),
+                        Field::new(None, meta_type::<u8>(), Some("T"), Vec::new()),
+                    ])),
+                    docs: vec![],
+                }
+            }
+        }
+        struct BB;
+        impl scale_info::TypeInfo for BB {
+            type Identity = Self;
+            fn type_info() -> scale_info::Type {
+                scale_info::Type {
+                    path: Path::new("NestedType", "my::module"),
+                    type_params: vec![
+                        TypeParameter::new("V", Some(meta_type::<u8>())),
+                        TypeParameter::new("U", Some(meta_type::<u16>())),
+                        TypeParameter::new("T", Some(meta_type::<u32>())),
+                    ],
+                    type_def: TypeDef::Composite(TypeDefComposite::new([
+                        Field::new(None, meta_type::<u32>(), Some("T"), Vec::new()),
+                        Field::new(None, meta_type::<u16>(), Some("U"), Vec::new()),
+                        Field::new(None, meta_type::<u8>(), Some("V"), Vec::new()),
+                    ])),
+                    docs: vec![],
+                }
+            }
+        }
+
+        struct C;
+        impl scale_info::TypeInfo for C {
+            type Identity = Self;
+            fn type_info() -> scale_info::Type {
+                scale_info::Type {
+                    path: Path::new("NestedType", "my::module"),
+                    type_params: vec![
+                        TypeParameter::new("A", Some(meta_type::<u8>())),
+                        TypeParameter::new("D", Some(meta_type::<u16>())),
+                        TypeParameter::new("B", Some(meta_type::<u32>())),
+                    ],
+                    type_def: TypeDef::Composite(TypeDefComposite::new([
+                        Field::new(None, meta_type::<u8>(), Some("A"), Vec::new()),
+                        Field::new(None, meta_type::<u16>(), Some("D"), Vec::new()),
+                        Field::new(None, meta_type::<u32>(), Some("B"), Vec::new()),
+                    ])),
+                    docs: vec![],
+                }
+            }
+        }
+
+        struct D;
+        impl scale_info::TypeInfo for D {
+            type Identity = Self;
+            fn type_info() -> scale_info::Type {
+                scale_info::Type {
+                    path: Path::new("Foo", "my::module"),
+                    type_params: vec![TypeParameter::new("A", Some(meta_type::<u8>()))],
+                    type_def: TypeDef::Composite(TypeDefComposite::new([Field::new(
+                        None,
+                        meta_type::<u8>(),
+                        Some("A"),
+                        Vec::new(),
+                    )])),
+                    docs: vec![],
+                }
+            }
+        }
+        struct E;
+        impl scale_info::TypeInfo for E {
+            type Identity = Self;
+            fn type_info() -> scale_info::Type {
+                scale_info::Type {
+                    path: Path::new("Foo", "my::module"),
+                    type_params: vec![TypeParameter::new("B", Some(meta_type::<u16>()))],
+                    type_def: TypeDef::Composite(TypeDefComposite::new([Field::new(
+                        None,
+                        meta_type::<u16>(),
+                        Some("B"),
+                        Vec::new(),
+                    )])),
+                    docs: vec![],
+                }
+            }
+        }
+
+        let mut registry = scale_info::Registry::new();
+        let id_b = registry.register_type(&meta_type::<B>()).id;
+        let id_bb = registry.register_type(&meta_type::<BB>()).id;
+        let id_a = registry.register_type(&meta_type::<A>()).id;
+        let id_c = registry.register_type(&meta_type::<C>()).id;
+
+        let id_d = registry.register_type(&meta_type::<D>()).id;
+        let id_e = registry.register_type(&meta_type::<E>()).id;
+
+        nested_type!(Y, A, A);
+        nested_type!(W, B, B);
+        nested_type!(Z, C, C);
+
+        let id_y = registry.register_type(&meta_type::<Y>()).id;
+        let id_w = registry.register_type(&meta_type::<W>()).id;
+        let id_z = registry.register_type(&meta_type::<Z>()).id;
+
+        let mut registry = PortableRegistry::from(registry);
+
+        // A != B, different field ordering
+        assert!(!types_equal(id_a, id_b, &registry));
+        assert!(!types_equal(id_a, id_bb, &registry));
+
+        // A == C, different generic param names
+        assert!(types_equal(id_a, id_c, &registry));
+
+        // D == E, different generic param names
+        assert!(types_equal(id_d, id_e, &registry));
+
+        assert!(types_equal(id_w, id_y, &registry));
+        assert!(types_equal(id_z, id_y, &registry));
+
+        ensure_unique_type_paths(&mut registry);
+        let settings = crate::TypeGeneratorSettings::new();
+        let output = crate::TypeGenerator::new(&registry, &settings)
+            .generate_types_mod()
+            .unwrap()
+            .to_token_stream(&settings);
+
+        let expected = quote! {
+                pub mod types {
+                use super::types;
+                pub mod my {
+                    use super::types;
+                    pub mod module {
+                        use super::types;
+                        pub struct Foo<_0>(pub _0, );
+                        pub struct NestedType1<_0, _1, _2>(pub _2, pub _1, pub _0, );
+                        pub struct NestedType2<_0, _1, _2>(pub _0, pub _1, pub _2, );
+                        pub struct ParamType < _0 > (pub _0 ,) ;
+                    }
+                }
+            }
+        };
+
+        assert_eq!(expected.to_string(), output.to_string())
+    }
+
+    #[test]
+    fn recursive_data() {
+        #[derive(TypeInfo)]
+        #[allow(dead_code)]
+        pub enum Test<A> {
+            None,
+            Many { inner: Vec<Self> },
+            Param(A),
+        }
+
+        #[derive(TypeInfo)]
+        #[allow(dead_code)]
+        pub struct TestStruct<A> {
+            param: A,
+            inner: Vec<Self>,
+        }
+
+        #[derive(TypeInfo)]
+        #[allow(dead_code)]
+        pub struct Foo<T> {
+            inner: Vec<T>,
+        }
+
+        #[derive(TypeInfo)]
+        #[allow(dead_code)]
+        pub enum FooEnum<T> {
+            None,
+            Go(Vec<T>),
+        }
+
+        let mut registry = scale_info::Registry::new();
+        let id_a = registry.register_type(&meta_type::<Test<u8>>()).id;
+        let id_b = registry.register_type(&meta_type::<Test<u32>>()).id;
+
+        let id_foo = registry.register_type(&meta_type::<Foo<u32>>()).id;
+
+        let id_foo_foo = registry
+            .register_type(&meta_type::<Foo<Foo<TestStruct<u32>>>>())
+            .id;
+
+        let id_foo_enum = registry.register_type(&meta_type::<FooEnum<u32>>()).id;
+        let id_foo_foo_enum = registry
+            .register_type(&meta_type::<FooEnum<FooEnum<TestStruct<u32>>>>())
+            .id;
+        let id_a_struct = registry.register_type(&meta_type::<TestStruct<u32>>()).id;
+        let id_b_struct = registry
+            .register_type(&meta_type::<TestStruct<TestStruct<u64>>>())
+            .id;
+
+        let registry = PortableRegistry::from(registry);
+
+        assert!(types_equal(id_foo, id_foo_foo, &registry));
+        assert!(types_equal(id_foo_enum, id_foo_foo_enum, &registry));
+
+        assert!(types_equal(id_a, id_b, &registry));
+        assert!(types_equal(id_a_struct, id_b_struct, &registry));
+
+        let settings = crate::TypeGeneratorSettings::new();
+        let output = crate::TypeGenerator::new(&registry, &settings)
+            .generate_types_mod()
+            .unwrap()
+            .to_token_stream(&settings);
+        // Why codegen for Foo expands this way?
+        let expected = quote! {
+            pub mod types {
+                use super::types;
+                pub mod scale_typegen {
+                    use super::types;
+                    pub mod utils {
+                        use super::types;
+                        pub mod tests {
+                            use super::types;
+                            pub struct Foo < _0 > {
+                                pub inner : :: std :: vec :: Vec < _0 > ,
+                            }
+                            pub enum FooEnum < _0 > {
+                                None ,
+                                Go (:: std :: vec :: Vec < _0 > ,) ,
+                            }
+                            pub enum Test<_0> {
+                                None,
+                                Many {
+                                    inner: ::std::vec::Vec<
+                                        types::scale_typegen::utils::tests::Test<_0>
+                                    >,
+                                },
+                                Param(_0, ),
+                            }
+                            pub struct TestStruct<_0> {
+                                pub param: _0,
+                                pub inner: ::std::vec::Vec<
+                                    types::scale_typegen::utils::tests::TestStruct<_0>
+                                >,
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        assert_eq!(expected.to_string(), output.to_string())
+    }
     #[test]
     fn ensure_unique_type_paths_test() {
         macro_rules! foo {
@@ -396,7 +808,7 @@ mod tests {
         }
 
         macro_rules! nested_type {
-            ($ty:ident, $generic:ty, $inner:ty) => {
+            ($ty:ident, $generic:ty, $inner:ty, $param_name:literal) => {
                 struct $ty;
                 impl scale_info::TypeInfo for $ty {
                     type Identity = Self;
@@ -404,7 +816,7 @@ mod tests {
                         scale_info::Type {
                             path: Path::new("NestedType", "my::module"),
                             type_params: vec![TypeParameter::new(
-                                "T",
+                                $param_name,
                                 Some(meta_type::<$generic>()),
                             )],
                             type_def: TypeDef::Composite(TypeDefComposite::new([Field::new(
@@ -424,22 +836,23 @@ mod tests {
         //
         //NestedType<T = u32>(u32)
         //NestedType<T = bool>(bool)
-        nested_type!(A, u32, u32);
-        nested_type!(B, bool, bool);
+        nested_type!(A, u32, u32, "T");
+        nested_type!(B, bool, bool, "T");
+        nested_type!(G, u64, u64, "B");
 
         // As above, but another layer of nesting before generic param used.
         //
         //NestedType<T = u32>(Vec<u32>)
         //NestedType<T = bool>(Vec<bool>)
-        nested_type!(C, bool, Vec<bool>);
-        nested_type!(D, u32, Vec<u32>);
+        nested_type!(C, bool, Vec<bool>, "T");
+        nested_type!(D, u32, Vec<u32>, "T");
 
         // A third layer of nesting just to really check the recursion.
         //
         //NestedType<T = u32>(Vec<Foo<u32>>)
         //NestedType<T = bool>(Vec<Foo<bool>>)
-        nested_type!(E, bool, Vec<Foo<bool>>);
-        nested_type!(F, u32, Vec<Foo<u32>>);
+        nested_type!(E, bool, Vec<Foo<bool>>, "T");
+        nested_type!(F, u32, Vec<Foo<u32>>, "T");
 
         let mut registry = scale_info::Registry::new();
         let id_a = registry.register_type(&meta_type::<A>()).id;
@@ -448,6 +861,8 @@ mod tests {
         let id_d = registry.register_type(&meta_type::<D>()).id;
         let id_e = registry.register_type(&meta_type::<E>()).id;
         let id_f = registry.register_type(&meta_type::<F>()).id;
+        let id_g = registry.register_type(&meta_type::<G>()).id;
+
         let mut registry = PortableRegistry::from(registry);
 
         // Despite how many layers of nesting, we identify that the generic
@@ -455,6 +870,7 @@ mod tests {
         assert!(types_equal(id_a, id_b, &registry));
         assert!(types_equal(id_c, id_d, &registry));
         assert!(types_equal(id_e, id_f, &registry));
+        assert!(types_equal(id_a, id_g, &registry));
 
         // Sanity check that the pairs are not equal with each other.
         assert!(!types_equal(id_a, id_c, &registry));
