@@ -18,7 +18,7 @@ pub(crate) fn sanity_pass(types: &PortableRegistry) -> Result<(), TypegenError> 
             return Err(TypegenError::RegistryIncorrect {
                 given_ty_id: ty.id,
                 expected_ty_id: idx,
-                ty_path: ty.ty.path.to_string(),
+                ty_def: format!("{:#?}", ty.ty),
             });
         }
     }

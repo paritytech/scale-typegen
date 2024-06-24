@@ -36,14 +36,14 @@ pub enum TypegenError {
     #[error("There are two types with the the same type path {0} but different structure. Use `scale_typegen::utils::ensure_unique_type_paths` on your `PortableRegistry` before, to avoid this error.")]
     DuplicateTypePath(String),
     /// PortableRegistry entry has incorrect Id.
-    #[error("PortableRegistry entry has incorrect type_id. expected type_id: {expected_ty_id}, got: {given_ty_id}.\nPath of the type: {ty_path:?}.\n This can happen if registry was modified with calls to `::retain()` in older versions of scale-info. Try generating a new metadata for use with `TypeGenerator`.")]
+    #[error("PortableRegistry entry has incorrect type_id. expected type_id: {expected_ty_id}, got: {given_ty_id}.\nDefinition of the type: {ty_def}.\nThis can happen if registry was modified with calls to `::retain()` in older versions of scale-info. Try generating a new metadata for use with `TypeGenerator`.")]
     RegistryIncorrect {
         /// Received type id
         given_ty_id: u32,
         /// Expected type id
         expected_ty_id: u32,
         /// Type definition
-        ty_path: String,
+        ty_def: String,
     },
 }
 
