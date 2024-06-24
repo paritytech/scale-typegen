@@ -1518,7 +1518,7 @@ fn ensure_unique_type_paths_test() {
         ]
     );
 
-    ensure_unique_type_paths(&mut registry);
+    ensure_unique_type_paths(&mut registry).expect("Corrupted PortableRegistry");
 
     let e2 = sorted_type_paths(&registry);
     assert_eq!(
@@ -1661,6 +1661,7 @@ fn assoc_types_skip_params() {
     #[derive(TypeInfo)]
     #[scale_info(skip_type_params(T))]
     pub struct X<T: Config> {
+        #[allow(dead_code)]
         pub inner: T::Inner,
     }
 
@@ -1715,6 +1716,7 @@ fn assoc_types_no_skip_params() {
 
     #[derive(TypeInfo)]
     pub struct X<T: Config> {
+        #[allow(dead_code)]
         pub inner: T::Inner,
     }
 

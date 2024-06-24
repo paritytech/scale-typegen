@@ -11,8 +11,23 @@ pub fn syn_type_path(ty: &Type<PortableForm>) -> Result<syn::TypePath, TypegenEr
     Ok(ty_path)
 }
 
+pub(crate) fn sanity_pass(types: &PortableRegistry) -> Result<(), TypegenError> {
+    for (idx, ty) in types.types.iter().enumerate() {
+        let idx = idx as u32;
+        if ty.id != idx {
+            return Err(TypegenError::RegistryIncorrect {
+                given_ty_id: ty.id,
+                expected_ty_id: idx,
+                ty_path: ty.ty.path.to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Deduplicates type paths in the provided Registry.
-pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
+pub fn ensure_unique_type_paths(types: &mut PortableRegistry) -> Result<(), TypegenError> {
+    sanity_pass(types)?;
     let mut types_with_same_type_path_grouped_by_shape = HashMap::<&[String], Vec<Vec<u32>>>::new();
 
     // First, group types if they are similar (same path, same shape).
@@ -71,6 +86,7 @@ pub fn ensure_unique_type_paths(types: &mut PortableRegistry) {
             n += 1;
         }
     }
+    Ok(())
 }
 
 /// This attempts to check whether two types are equal in terms of their shape.
@@ -399,7 +415,7 @@ mod tests {
         let _ = registry.register_type(&scale_info::meta_type::<Bar>()).id;
         let mut registry = scale_info::PortableRegistry::from(registry);
 
-        ensure_unique_type_paths(&mut registry);
+        ensure_unique_type_paths(&mut registry).expect("Corrupted PortableRegistry");
 
         let settings = crate::TypeGeneratorSettings::new();
         let generated = crate::typegen::ir::ToTokensWithSettings::to_token_stream(
@@ -614,7 +630,7 @@ mod tests {
         assert!(types_equal(id_w, id_y, &registry));
         assert!(types_equal(id_z, id_y, &registry));
 
-        ensure_unique_type_paths(&mut registry);
+        ensure_unique_type_paths(&mut registry).expect("Corrupted PortableRegistry");
         let settings = crate::TypeGeneratorSettings::new();
         let output = crate::TypeGenerator::new(&registry, &settings)
             .generate_types_mod()
@@ -789,7 +805,7 @@ mod tests {
         assert_eq!(ident(id_6), "Foo");
 
         // after:
-        ensure_unique_type_paths(&mut registry);
+        ensure_unique_type_paths(&mut registry).expect("Corrupted PortableRegistry");
 
         let ident = |id: u32| registry.resolve(id).unwrap().path.ident().unwrap();
         assert_eq!(ident(id_1), "Foo1");
@@ -879,7 +895,7 @@ mod tests {
 
         // Now, check that the generated output is sane and in line with this...
 
-        ensure_unique_type_paths(&mut registry);
+        ensure_unique_type_paths(&mut registry).expect("Corrupted PortableRegistry");
         let settings = crate::TypeGeneratorSettings::new();
         let output = crate::TypeGenerator::new(&registry, &settings)
             .generate_types_mod()
