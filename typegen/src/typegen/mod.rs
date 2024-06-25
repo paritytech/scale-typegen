@@ -1,6 +1,9 @@
 use std::collections::btree_map::Entry;
 
-use crate::{utils::types_equal, TypegenError};
+use crate::{
+    utils::{sanity_pass, types_equal},
+    TypegenError,
+};
 
 use self::{
     ir::module_ir::ModuleIR,
@@ -65,6 +68,8 @@ impl<'a> TypeGenerator<'a> {
 
     /// Generate a module containing all types defined in the supplied type registry.
     pub fn generate_types_mod(&self) -> Result<ModuleIR, TypegenError> {
+        sanity_pass(self.type_registry)?;
+
         let flat_derives_registry = self
             .settings
             .derives
