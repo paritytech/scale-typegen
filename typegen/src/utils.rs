@@ -15,7 +15,7 @@ pub(crate) fn sanity_pass(types: &PortableRegistry) -> Result<(), TypegenError> 
     for (idx, ty) in types.types.iter().enumerate() {
         let idx = idx as u32;
         if ty.id != idx {
-            return Err(TypegenError::RegistryIncorrect {
+            return Err(TypegenError::RegistryTypeIdsInvalid {
                 given_ty_id: ty.id,
                 expected_ty_id: idx,
                 ty_def: format!("{:#?}", ty.ty),

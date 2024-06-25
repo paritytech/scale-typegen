@@ -37,7 +37,7 @@ pub enum TypegenError {
     DuplicateTypePath(String),
     /// PortableRegistry entry has incorrect Id.
     #[error("PortableRegistry entry has incorrect type_id. expected type_id: {expected_ty_id}, got: {given_ty_id}.\nDefinition of the type: {ty_def}.\nThis can happen if registry was modified with calls to `::retain()` in older versions of scale-info. Try generating a new metadata to fix this.")]
-    RegistryIncorrect {
+    RegistryTypeIdsInvalid {
         /// Received type id
         given_ty_id: u32,
         /// Expected type id
