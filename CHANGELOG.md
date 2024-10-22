@@ -4,7 +4,7 @@
 - Bump `scale-value` to 0.17.0 ([#35](https://github.com/paritytech/scale-typegen/pull/35))
 - Bump `scale-encode` to 0.8.0 ([#36](https://github.com/paritytech/scale-typegen/pull/36))
 - Bump `scale-decode` to 0.14.0 ([#37](https://github.com/paritytech/scale-typegen/pull/37))
-- Bump `frame-metadata` to 17 ([#38](https://github.com/paritytech/scale-typegen/pull/38))
+- Bump `frame-metadata` to 17.0.0 ([#38](https://github.com/paritytech/scale-typegen/pull/38))
 
 # [0.8.0] - 2024-05-24
 
