@@ -28,7 +28,7 @@ thiserror = "1.0.50"
 prettyplease = "0.2.15"
 scale-decode = "0.13.0"
 scale-encode = "0.7.0"
-frame-metadata = { version = "16.0.0", default-features = false, features = ["current", "std"] }
+frame-metadata = { version = "17.0.0", default-features = false, features = ["current", "std"] }
 bitvec = { version = "1", default-features = false, features = ["alloc"] }
 pretty_assertions = "1.4.0"
 anyhow = "1.0.75"

@@ -125,9 +125,9 @@ dependencies = [
 
 [[package]]
 name = "frame-metadata"
-version = "16.0.0"
+version = "17.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87cf1549fba25a6fcac22785b61698317d958e96cac72a59102ea45b9ae64692"
+checksum = "701bac17e9b55e0f95067c428ebcb46496587f08e8cf4ccc0fe5903bea10dbb8"
 dependencies = [
  "cfg-if",
  "parity-scale-codec",
@@ -424,7 +424,7 @@ name = "scale-typegen"
 version = "0.8.0"
 dependencies = [
  "bitvec",
- "frame-metadata 16.0.0",
+ "frame-metadata 17.0.0",
  "parity-scale-codec",
  "pretty_assertions",
  "prettyplease",
