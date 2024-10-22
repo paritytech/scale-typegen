@@ -1,3 +1,11 @@
+
+# [0.9.0] - 2024-10-22
+
+- Bump `scale-value` to 0.17.0 ([#35](https://github.com/paritytech/scale-typegen/pull/35))
+- Bump `scale-encode` to 0.8.0 ([#36](https://github.com/paritytech/scale-typegen/pull/36))
+- Bump `scale-decode` to 0.14.0 ([#37](https://github.com/paritytech/scale-typegen/pull/37))
+- Bump `frame-metadata` to 17.0.0 ([#38](https://github.com/paritytech/scale-typegen/pull/38))
+
 # [0.8.0] - 2024-05-24
 
 This release doesn't change the public API, but does effect the generated code to make it more correct and de-duplicate types better, but also a little less forgiving in certain edge cases. As such, I've decided to do a minor bump so that opting in to this change is explicit.
