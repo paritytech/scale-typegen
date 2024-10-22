@@ -84,6 +84,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_more"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
+dependencies = [
+ "derive_more-impl",
+]
+
+[[package]]
+name = "derive_more-impl"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.60",
+ "unicode-xid",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -111,17 +132,6 @@ name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
-
-[[package]]
-name = "frame-metadata"
-version = "15.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "878babb0b136e731cc77ec2fd883ff02745ff21e6fb662729953d44923df009c"
-dependencies = [
- "cfg-if",
- "parity-scale-codec",
- "scale-info",
-]
 
 [[package]]
 name = "frame-metadata"
@@ -359,11 +369,11 @@ dependencies = [
 
 [[package]]
 name = "scale-decode"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b12ebca36cec2a3f983c46295b282b35e5f8496346fb859a8776dad5389e5389"
+checksum = "f8ae9cc099ae85ff28820210732b00f019546f36f33225f509fe25d5816864a0"
 dependencies = [
- "derive_more",
+ "derive_more 1.0.0",
  "parity-scale-codec",
  "scale-bits",
  "scale-type-resolver",
@@ -372,11 +382,11 @@ dependencies = [
 
 [[package]]
 name = "scale-encode"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac89c68dd1142f71a5b97850b9031e9a0d3ce708f5de5e7234cddb3b6fc7c8db"
+checksum = "5f9271284d05d0749c40771c46180ce89905fd95aa72a2a2fddb4b7c0aa424db"
 dependencies = [
- "derive_more",
+ "derive_more 1.0.0",
  "parity-scale-codec",
  "scale-bits",
  "scale-type-resolver",
@@ -391,7 +401,7 @@ checksum = "7c453e59a955f81fb62ee5d596b450383d699f152d350e9d23a0db2adb78e4c0"
 dependencies = [
  "bitvec",
  "cfg-if",
- "derive_more",
+ "derive_more 0.99.17",
  "parity-scale-codec",
  "scale-info-derive",
  "serde",
@@ -424,7 +434,7 @@ name = "scale-typegen"
 version = "0.8.0"
 dependencies = [
  "bitvec",
- "frame-metadata 16.0.0",
+ "frame-metadata",
  "parity-scale-codec",
  "pretty_assertions",
  "prettyplease",
@@ -458,15 +468,14 @@ dependencies = [
 
 [[package]]
 name = "scale-value"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2cf9738c263c665144177201126bdad39d3d62512152f178f35002228026976"
+checksum = "f5e0ef2a0ee1e02a69ada37feb87ea1616ce9808aca072befe2d3131bf28576e"
 dependencies = [
  "base58",
  "blake2",
- "derive_more",
+ "derive_more 1.0.0",
  "either",
- "frame-metadata 15.1.0",
  "parity-scale-codec",
  "scale-bits",
  "scale-decode",
@@ -596,6 +605,12 @@ name = "unicode-ident"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
+
+[[package]]
+name = "unicode-xid"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
 name = "version_check"
