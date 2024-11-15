@@ -8,6 +8,7 @@ This is a breaking release that mainly bumps `scale-related dependencies` to the
 - Bump `scale-encode` to 0.10.0
 - Bump `scale-decode` to 0.16.0
 - Bump `scale-bits` to 0.7.0
+- Bump MSRV to 1.81.0
 
 # [0.9.0] - 2024-10-22
 
