@@ -1,4 +1,8 @@
 
+# [0.10.0] - 2024-11-15
+
+This re
+
 # [0.9.0] - 2024-10-22
 
 - Bump `scale-value` to 0.17.0 ([#35](https://github.com/paritytech/scale-typegen/pull/35))
