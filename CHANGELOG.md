@@ -1,7 +1,13 @@
 
 # [0.10.0] - 2024-11-15
 
-This re
+This is a breaking release that mainly bumps `scale-related dependencies` to their latest versions which are exposed in the public API.
+
+- Bump `thiserror` to 2.0
+- Bump `scale-value` to 0.18.0
+- Bump `scale-encode` to 0.10.0
+- Bump `scale-decode` to 0.16.0
+- Bump `scale-bits` to 0.7.0
 
 # [0.9.0] - 2024-10-22
 
