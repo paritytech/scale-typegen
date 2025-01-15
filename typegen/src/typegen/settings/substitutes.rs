@@ -355,7 +355,7 @@ fn is_absolute(path: &syn::Path) -> bool {
         || path
             .segments
             .first()
-            .map_or(false, |segment| segment.ident == "crate")
+            .is_some_and(|segment| segment.ident == "crate")
 }
 
 /// tries to convert a [`syn::Path`] into an `AbsolutePath`. Only succeeds if the path is not a relative path.
@@ -374,7 +374,7 @@ pub trait TryIntoSynPath {
     fn syn_path(self) -> Option<syn::Path>;
 }
 
-impl<'a> TryIntoSynPath for &'a scale_info::Path<PortableForm> {
+impl TryIntoSynPath for &scale_info::Path<PortableForm> {
     fn syn_path(self) -> Option<syn::Path> {
         if self.segments.is_empty() {
             return None;
