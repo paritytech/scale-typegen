@@ -30,7 +30,7 @@ pub type TyMiddleware =
 /// Middleware for a `CodeTransformer` to convert a type path encountered into a different type path.
 pub type TyPathMiddleware = Box<dyn Fn(TokenStream) -> TokenStream>;
 
-impl<'a> CodeTransformer<'a> {
+impl CodeTransformer<'_> {
     /// resolves a type path, removes the generic bits, e.g. `Foo<T, R>` becomes `Foo`,
     /// and, if the correct ty_path_middleware is set, prunes the resulting type path.
     fn resolve_type_path_omit_generics(&self, type_id: u32) -> anyhow::Result<TokenStream> {
