@@ -89,6 +89,6 @@ impl ModuleIR {
             .children
             .entry(child_ident.clone())
             .or_insert_with(|| ModuleIR::new(child_ident, self.root_mod.clone()));
-        return child.get_or_insert_submodule(&namespace[1..]);
+        child.get_or_insert_submodule(&namespace[1..])
     }
 }
