@@ -333,7 +333,7 @@ impl<'a> TypeGenerator<'a> {
     ) -> Result<TypePath, TypegenError> {
         if let Some(parent_type_param) = parent_type_params.iter().find(|tp| {
             tp.concrete_type_id == id
-                && original_name.map_or(true, |original_name| tp.original_name == original_name)
+                && original_name.is_none_or(|original_name| tp.original_name == original_name)
         }) {
             let type_path = TypePath::from_parameter(parent_type_param.clone());
             return Ok(type_path);
