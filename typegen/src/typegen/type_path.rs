@@ -216,6 +216,7 @@ impl TypePathType {
                     "NonZeroU128" => parse_quote!(::core::num::NonZeroU128),
                     "NonZeroIsize" => parse_quote!(::core::num::NonZeroIsize),
                     "NonZeroUsize" => parse_quote!(::core::num::NonZeroUsize),
+                    "Duration" => parse_quote!(::core::time::Duration),
                     ident => panic!("Unknown prelude type '{ident}'"),
                 }
             }

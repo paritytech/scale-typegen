@@ -5,15 +5,15 @@ resolver = "2"
 [workspace.package]
 authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2021"
-version = "0.11.0"
+version = "0.11.1"
 rust-version = "1.81.0"
 license = "Apache-2.0 OR GPL-3.0"
 repository = "https://github.com/paritytech/scale-typegen"
 homepage = "https://www.parity.io/"
 
 [workspace.dependencies]
-scale-typegen-description = { version = "0.11.0", path = "description" }
-scale-typegen = { version = "0.11.0", path = "typegen" }
+scale-typegen-description = { version = "0.11.1", path = "description" }
+scale-typegen = { version = "0.11.1", path = "typegen" }
 
 # external dependencies
 parity-scale-codec = { version = "3.6.12", features = ["derive"] }
