@@ -1,3 +1,7 @@
+# [0.11.1] - 2025-05-07
+
+- Add `core::time::Duration` to the list of prelude types.
+
 # [0.11.0] - 2025-03-05
 
 - Bump `frame-metadata` to latest (20.0.0)
