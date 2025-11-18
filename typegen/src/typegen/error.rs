@@ -8,8 +8,15 @@ use quote::ToTokens;
 #[non_exhaustive]
 pub enum TypegenError {
     /// Could not parse into a syn type.
-    #[error("Could not parse into a syn type: {0}")]
-    SynParseError(#[from] syn::Error),
+    #[error("Could not parse '{string}' into syn type {target}: {error}")]
+    SynParseError {
+        /// String that failed to parse.
+        string: String,
+        /// target we're parsing into.
+        target: &'static str,
+        /// The reason why the ident failed to parse.
+        error: syn::Error,
+    },
     /// Fields should either be all named or all unnamed, make sure you are providing a valid metadata.
     #[error("Fields should either be all named or all unnamed, make sure you are providing a valid metadata: {0}")]
     InvalidFields(String),

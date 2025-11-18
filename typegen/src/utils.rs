@@ -7,7 +7,12 @@ use crate::TypegenError;
 /// Converts a [`scale_info::Type`] into a [`syn::TypePath`].
 pub fn syn_type_path(ty: &Type<PortableForm>) -> Result<syn::TypePath, TypegenError> {
     let joined_path = ty.path.segments.join("::");
-    let ty_path: syn::TypePath = syn::parse_str(&joined_path)?;
+    let ty_path: syn::TypePath =
+        syn::parse_str::<syn::TypePath>(&joined_path).map_err(|e| TypegenError::SynParseError {
+            string: joined_path,
+            target: core::any::type_name::<syn::TypePath>(),
+            error: e,
+        })?;
     Ok(ty_path)
 }
 
