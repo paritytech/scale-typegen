@@ -2,6 +2,10 @@
 
 - Add `core::time::Duration` to the list of prelude types.
 
+# [0.12.0] - 2025-11-18
+
+- Improve `TypegenError::SynParseError` to note the string that failed to parse and the target type.
+
 # [0.11.0] - 2025-03-05
 
 - Bump `frame-metadata` to latest (20.0.0)

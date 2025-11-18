@@ -133,13 +133,16 @@ impl<'a> TypeGenerator<'a> {
 
         let mut type_params = TypeParameters::from_scale_info(&ty.type_params);
 
-        let name = ty
-            .path
-            .ident()
-            .map(|e| syn::parse_str::<Ident>(&e))
-            .expect(
-            "Structs and enums should have a name. Checked with namespace.is_empty() above. qed;",
-        )?;
+        let name = {
+            let ident = ty.path.ident().expect(
+                "Structs and enums should have a name. Checked with namespace.is_empty() above. qed;",
+            );
+            syn::parse_str::<Ident>(&ident).map_err(|e| TypegenError::SynParseError {
+                string: ident,
+                target: core::any::type_name::<Ident>(),
+                error: e,
+            })
+        }?;
 
         let docs = self.docs_from_scale_info(&ty.docs);
 
@@ -159,7 +162,13 @@ impl<'a> TypeGenerator<'a> {
                     .variants
                     .iter()
                     .map(|v| {
-                        let name = syn::parse_str::<Ident>(&v.name)?;
+                        let name = syn::parse_str::<Ident>(&v.name).map_err(|e| {
+                            TypegenError::SynParseError {
+                                string: v.name.clone(),
+                                target: core::any::type_name::<Ident>(),
+                                error: e,
+                            }
+                        })?;
                         let kind = self.create_composite_ir_kind(&v.fields, &mut type_params)?;
                         let docs = self.docs_from_scale_info(&v.docs);
                         Ok((v.index, CompositeIR { kind, name, docs }))
@@ -218,7 +227,13 @@ impl<'a> TypeGenerator<'a> {
                 .iter()
                 .map(|field| {
                     let field_name = field.name.as_ref().unwrap();
-                    let ident = syn::parse_str::<Ident>(field_name)?;
+                    let ident = syn::parse_str::<Ident>(field_name).map_err(|e| {
+                        TypegenError::SynParseError {
+                            string: field_name.clone(),
+                            target: core::any::type_name::<Ident>(),
+                            error: e,
+                        }
+                    })?;
 
                     let path = self.resolve_field_type_path(
                         field.ty.id,
