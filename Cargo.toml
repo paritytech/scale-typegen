@@ -20,7 +20,7 @@ parity-scale-codec = { version = "3.6.12", features = ["derive"] }
 proc-macro2 = "1.0.89"
 quote = "1.0.33"
 scale-bits = "0.7.0"
-scale-info = { version = "2.11.1", features = ["derive", "bit-vec", "decode", "docs", "serde"] }
+scale-info = { version = "2.11.6", features = ["derive", "bit-vec", "decode", "docs", "serde"] }
 smallvec = "1.10.0"
 syn = { version = "2.0.38", features = ["full", "extra-traits"] }
 thiserror = { version = "2.0.11", default-features = false }
